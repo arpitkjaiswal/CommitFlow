@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>LeetCode → GitHub Sync</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- Animated background orbs -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <div class="container">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+        <div class="logo-text">
+          <span class="brand">LeetSync</span>
+          <span class="tagline">LeetCode → GitHub</span>
+        </div>
+      </div>
+      <div class="header-badge" id="connectionBadge">
+        <span class="badge-dot"></span>
+        <span class="badge-text">Ready</span>
+      </div>
+    </header>
+
+    <!-- Config Section -->
+    <section class="card card-enter" style="--delay: 0">
+      <div class="card-header">
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <span>Authentication</span>
+      </div>
+      <div class="field">
+        <label for="token">Personal Access Token</label>
+        <div class="input-wrapper">
+          <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" />
+          <button class="toggle-vis" id="toggleToken" type="button" title="Show/hide token">
+            <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card card-enter" style="--delay: 1">
+      <div class="card-header">
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+        </svg>
+        <span>Repository</span>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="owner">Owner</label>
+          <div class="input-wrapper has-status">
+            <input type="text" id="owner" placeholder="username" autocomplete="off" />
+            <span class="status-icon" id="ownerStatus"></span>
+          </div>
+          <span class="error-msg" id="ownerError"></span>
+        </div>
+        <div class="field">
+          <label for="repo">Repository</label>
+          <div class="input-wrapper has-status">
+            <input type="text" id="repo" placeholder="leetcode-solutions" autocomplete="off" />
+            <span class="status-icon" id="repoStatus"></span>
+          </div>
+          <span class="error-msg" id="repoError"></span>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="branch">Branch</label>
+          <input type="text" id="branch" placeholder="main" value="main" />
+        </div>
+        <div class="field">
+          <label for="pathTemplate">Path Template</label>
+          <input type="text" id="pathTemplate" placeholder="solutions/{slug}" value="solutions/{slug}" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Options -->
+    <section class="card card-enter" style="--delay: 2">
+      <label class="toggle-row">
+        <span class="toggle-label">
+          <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Only sync Accepted
+        </span>
+        <div class="switch">
+          <input type="checkbox" id="acceptedOnly" checked />
+          <span class="slider"></span>
+        </div>
+      </label>
+    </section>
+
+    <!-- Actions -->
+    <div class="actions card-enter" style="--delay: 3">
+      <button id="syncBtn" class="btn btn-primary">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        <span>Sync All Submissions</span>
+      </button>
+      <button id="saveBtn" class="btn btn-secondary">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+        <span>Save</span>
+      </button>
+      <button id="resetBtn" class="btn btn-ghost" title="Clear local sync history">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        <span>Reset</span>
+      </button>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-area card-enter" style="--delay: 4">
+      <div class="progress-track">
+        <div class="progress-fill" id="bar"></div>
+      </div>
+      <p id="status" class="status-text"></p>
+    </div>
+
+    <!-- Footer hint -->
+    <p class="hint card-enter" style="--delay: 5">
+      Ensure you're <strong>logged in</strong> to LeetCode in an open tab before syncing.
+      This scans your <em>full</em> submission history.
+    </p>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

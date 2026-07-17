@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LeetSync — Admin Telemetry Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="background-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+  </div>
+
+  <div class="container">
+    <header class="header">
+      <div class="logo-area">
+        <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+        <div class="brand-text">
+          <h1>LeetSync</h1>
+          <span>Telemetry Dashboard</span>
+        </div>
+      </div>
+      <div class="live-indicator">
+        <span class="pulse-dot"></span>
+        <span>Live Telemetry Connection</span>
+      </div>
+    </header>
+
+    <!-- Stats Summary Cards -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon-wrapper users">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+        </div>
+        <div class="stat-info">
+          <h3>Total Unique Users</h3>
+          <p id="totalUsers">0</p>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon-wrapper syncs">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+          </svg>
+        </div>
+        <div class="stat-info">
+          <h3>Total Sync Actions</h3>
+          <p id="totalSyncs">0</p>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon-wrapper problems">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        </div>
+        <div class="stat-info">
+          <h3>Total Problems Synced</h3>
+          <p id="totalProblems">0</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Table Section -->
+    <section class="table-card">
+      <div class="table-header">
+        <h2>Active User Log</h2>
+        <div class="search-box">
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="searchInput" placeholder="Search by user or repo..." autocomplete="off">
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>GitHub User</th>
+              <th>Target Repository</th>
+              <th>Action / Mode</th>
+              <th>Problems Synced</th>
+              <th>Extension Version</th>
+              <th>Sync Date</th>
+            </tr>
+          </thead>
+          <tbody id="logBody">
+            <tr>
+              <td colspan="6" class="placeholder-row">Loading logs from database...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    async function fetchData() {
+      try {
+        // Fetch stats
+        const statsRes = await fetch('/api/stats');
+        const stats = await statsRes.json();
+        document.getElementById('totalUsers').textContent = stats.totalUsers;
+        document.getElementById('totalSyncs').textContent = stats.totalSyncs;
+        document.getElementById('totalProblems').textContent = stats.totalProblemsSynced;
+
+        // Fetch logs
+        const logsRes = await fetch('/api/logs');
+        const logs = await logsRes.json();
+        
+        const logBody = document.getElementById('logBody');
+        logBody.innerHTML = '';
+
+        if (logs.length === 0) {
+          logBody.innerHTML = `<tr><td colspan="6" class="placeholder-row">No sync history recorded yet. Open your extension and run a sync!</td></tr>`;
+          return;
+        }
+
+        renderLogs(logs);
+
+        // Bind Search Input
+        const searchInput = document.getElementById('searchInput');
+        searchInput.oninput = () => {
+          const query = searchInput.value.toLowerCase().trim();
+          const filtered = logs.filter(l => 
+            l.owner.toLowerCase().includes(query) || 
+            l.repo.toLowerCase().includes(query) ||
+            l.action.toLowerCase().includes(query)
+          );
+          renderLogs(filtered);
+        };
+
+      } catch (err) {
+        console.error('Error fetching data:', err);
+      }
+    }
+
+    function renderLogs(logsList) {
+      const logBody = document.getElementById('logBody');
+      logBody.innerHTML = '';
+
+      if (logsList.length === 0) {
+        logBody.innerHTML = `<tr><td colspan="6" class="placeholder-row">No matching records found.</td></tr>`;
+        return;
+      }
+
+      logsList.forEach(log => {
+        const tr = document.createElement('tr');
+        
+        // Owner Cell
+        const ownerTd = document.createElement('td');
+        ownerTd.innerHTML = `
+          <div class="user-cell">
+            <span class="user-avatar">${log.owner.substring(0, 2).toUpperCase()}</span>
+            <a href="https://github.com/${encodeURIComponent(log.owner)}" target="_blank" class="owner-link">@${escapeHtml(log.owner)}</a>
+          </div>
+        `;
+        
+        // Repo Cell
+        const repoTd = document.createElement('td');
+        repoTd.innerHTML = `<a href="https://github.com/${encodeURIComponent(log.owner)}/${encodeURIComponent(log.repo)}" target="_blank" class="repo-link">${escapeHtml(log.repo)}</a>`;
+        
+        // Action Cell
+        const actionTd = document.createElement('td');
+        const isBulk = log.action === 'bulk_sync_complete';
+        const actionText = isBulk ? 'Bulk Sync' : (log.action === 'auto_sync_complete' ? 'Auto Sync' : escapeHtml(log.action));
+        actionTd.innerHTML = `<span class="badge ${isBulk ? 'bulk' : 'auto'}">${actionText}</span>`;
+        
+        // Count Cell
+        const countTd = document.createElement('td');
+        countTd.className = 'count-cell';
+        countTd.textContent = log.problemsSynced;
+        
+        // Version Cell
+        const versionTd = document.createElement('td');
+        versionTd.innerHTML = `<code class="version-code">v${escapeHtml(log.version)}</code>`;
+        
+        // Date Cell
+        const dateTd = document.createElement('td');
+        dateTd.className = 'date-cell';
+        const dateObj = new Date(log.timestamp);
+        dateTd.textContent = dateObj.toLocaleString();
+
+        tr.appendChild(ownerTd);
+        tr.appendChild(repoTd);
+        tr.appendChild(actionTd);
+        tr.appendChild(countTd);
+        tr.appendChild(versionTd);
+        tr.appendChild(dateTd);
+        logBody.appendChild(tr);
+      });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    // Initial load and auto refresh
+    fetchData();
+    setInterval(fetchData, 10000);
+  </script>
+</body>
+</html>
