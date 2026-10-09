@@ -113,7 +113,7 @@ The extension maps common LeetCode language slugs (Python, C++, Java, JavaScript
 
 ## Optional dashboard
 
-The dashboard shows reported sync actions, distinct target owners and summed problem counts. These are **client-reported telemetry**, not audited user or unique-problem counts. Resetting and syncing again can increase totals.
+The dashboard shows reported sync actions, distinct target owners and summed problem counts. These are **client-reported telemetry**, not audited user or unique-problem counts. Resetting and syncing again can increase totals. The dashboard is branded **CommitFlow**; LeetSync remains the Chrome extension. Its LeetCode progress card is a dated public-profile snapshot.
 
 ### Run on your computer
 
