@@ -170,6 +170,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 let lastSeenSubmissionId = null;
 let pollInterval = null;
+let pollInFlight = false;
 
 async function getLatestSubmission() {
   try {
@@ -197,7 +198,10 @@ async function startAutoSyncPolling() {
       return;
     }
 
+    if (pollInFlight) return;
+    pollInFlight = true;
     const latest = await getLatestSubmission();
+    pollInFlight = false;
     if (latest && String(latest.id) !== String(lastSeenSubmissionId)) {
       // Check if it's finished judging
       const isJudging = latest.status_display === "Pending" || latest.status_display === "Judging";
@@ -225,7 +229,7 @@ function initAutoSyncListener() {
   // Listen for click on submit button
   document.addEventListener("click", (e) => {
     const target = e.target;
-    if (!target) return;
+    if (!(target instanceof Element)) return;
     
     const isSubmitBtn = 
       target.matches('button[data-e2e-locator="console-submit-btn"]') ||

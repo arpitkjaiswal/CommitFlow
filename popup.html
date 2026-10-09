@@ -104,6 +104,19 @@
       </label>
     </section>
 
+    <details class="field-group" style="margin:16px 0">
+      <summary>Commit identity &amp; optional telemetry</summary>
+      <label for="commitEmail">Commit email (optional)</label>
+      <input id="commitEmail" type="email" placeholder="Exact email from GitHub Settings → Emails" />
+      <p>Defaults to the token owner's public email or ID-based GitHub noreply address.</p>
+      <label><input id="telemetryEnabled" type="checkbox" /> Share sync counts with my dashboard</label>
+      <p>Off by default. Sends owner, repository, mode, count, version and time. Never sends code or your GitHub token.</p>
+      <label for="telemetryUrl">Dashboard origin</label>
+      <input id="telemetryUrl" type="url" placeholder="http://localhost:3000 or https://your-host" />
+      <label for="telemetryKey">Telemetry key (not your GitHub token)</label>
+      <input id="telemetryKey" type="password" autocomplete="off" />
+    </details>
+
     <!-- Actions -->
     <div class="actions card-enter" style="--delay: 3">
       <button id="syncBtn" class="btn btn-primary">

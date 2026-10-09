@@ -1,245 +1,264 @@
-# 🚀 LeetSync
-### Automatically sync your LeetCode submissions to GitHub with original solve dates
-
+<p align="center"><img src="icons/icon128.png" width="88" alt="LeetSync logo" /></p>
+<h1 align="center">LeetSync</h1>
+<p align="center"><strong>Your LeetCode solutions, organized in GitHub.</strong><br />A Chrome extension for historical imports and automatic submission sync.</p>
 <p align="center">
-  <img src="icons/icon128.png" alt="LeetSync Logo" width="80" height="80" />
+  <a href="https://github.com/arpitkjaiswal/LeetSync/actions/workflows/checks.yml"><img alt="Checks" src="https://github.com/arpitkjaiswal/LeetSync/actions/workflows/checks.yml/badge.svg" /></a>
+  <img alt="Chrome Manifest V3" src="https://img.shields.io/badge/Chrome-Manifest_V3-4285F4" />
+  <img alt="JavaScript" src="https://img.shields.io/badge/JavaScript-vanilla-F7DF1E" />
 </p>
 
-<p align="center">
-  <strong>The only Chrome extension that can sync your complete LeetCode history while preserving your original solve dates on GitHub.</strong>
-</p>
+[Quick start](#quick-start) · [Architecture](#architecture) · [Optional dashboard](#optional-dashboard) · [Deployment](#deployment) · [Troubleshooting](#troubleshooting)
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Manifest-V3-blue?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Manifest V3" />
-  <img src="https://img.shields.io/badge/GitHub-API-black?style=for-the-badge&logo=github&logoColor=white" alt="GitHub API" />
-  <img src="https://img.shields.io/badge/GraphQL-LeetCode-orange?style=for-the-badge&logo=graphql&logoColor=white" alt="LeetCode GraphQL" />
-</p>
+## What it does
 
----
+- Scans your LeetCode history and selects the **latest accepted submission per problem** by default.
+- Writes a solution file and a problem README in one Git commit, using that submission's timestamp.
+- Detects Submit clicks and Ctrl/Cmd+Enter, polls for a result, then queues automatic sync.
+- Records completed submissions locally, scoped to repository, branch, folder template and acceptance setting.
+- Uses **fast-forward-only** GitHub updates so a concurrent branch change cannot be overwritten.
+- Optionally reports sync counts to your own Express + SQLite dashboard. Telemetry is **off by default**.
 
-## 📸 Visuals & Screenshots
+**The extension works without the dashboard.** A hosted dashboard does not install the extension or perform sync in the cloud. Your signed-in LeetCode browser session and a GitHub token are still required.
 
-### Extension Settings & Live Synchronization
-![LeetSync Popup UI](assets/popup_ui.png)
+> Status: automated extension regression tests and backend HTTP tests are included. These mock GitHub/Chrome/LeetCode where needed; they do not prove a live authenticated LeetCode-to-GitHub sync. Follow the manual smoke check below before using a valuable destination repository.
 
-### Reconstructed GitHub Contribution Graph
-![GitHub Contribution Graph](assets/contribution_graph.png)
+## Preview
 
----
+<p align="center"><img src="assets/popup_ui.png" alt="LeetSync popup screenshot from the original repository" width="720" /></p>
 
-## ❓ Why LeetSync?
+The screenshot predates the additional commit-email and optional telemetry settings.
 
-Many existing solutions only upload future submissions or create commits using the current date. LeetSync reconstructs your entire solving history by:
+## Quick start
 
-*   **Fetching every accepted submission** from the very beginning.
-*   **Keeping only the newest accepted solution** per problem to keep your repo neat.
-*   **Creating Git commits using the original submission timestamp**, preserving your historical GitHub contribution graph (green squares).
+### 1. Install locally in Chrome
 
----
+```bash
+git clone https://github.com/arpitkjaiswal/LeetSync.git
+cd LeetSync
+```
 
-## 📊 Feature Comparison
+1. Open `chrome://extensions` and enable **Developer mode**.
+2. Choose **Load unpacked** and select the repository root containing `manifest.json`.
+3. Pin LeetSync, then open or refresh a tab at `https://leetcode.com` and sign in.
 
-| Feature | LeetSync | Other Extensions |
-| :--- | :---: | :---: |
-| **Complete Historical Sync** | ✅ | ⚠️ Partial |
-| **Original Solve-Date Commits** | ✅ | ❌ |
-| **Auto-Sync** | ✅ | ✅ |
-| **README Generation** | ✅ | Some |
-| **Works without LC Credentials** | ✅ | Some require cookies |
+Use Chrome 110 or newer (prefer a current stable release). The extension has no build step and needs no npm packages. Node.js 22+ is needed only for tests or the optional server.
 
----
+### 2. Prepare GitHub
 
-## 🌟 Key Features
+Create a disposable solutions repository for the first test. Generate a **fine-grained personal access token** restricted to that repository with **Contents: Read and write**. Organization approval and branch rules may still apply.
 
-*   **📅 Original Solve-Date Commits (Green Contribution Squares):** Uses GitHub's low-level Git Data API to write commits with the **original LeetCode solve date**, ensuring your GitHub contribution graph accurately reflects when you actually solved the problems.
-*   **🔄 Complete Historical Sync:** Pages through your entire historical submission log—not just your future submissions.
-*   **⚡ Real-Time Auto-Sync:** Intercepts editor submit clicks (`Ctrl/Cmd + Enter` or clicking **Submit**) on `leetcode.com`, polls for the judge result, and automatically pushes your newly accepted solves in the background.
-*   **🔒 Secure & Zero-Credential for LeetCode:** Runs within your browser session on the `leetcode.com` origin. Your cookies are attached automatically, meaning **no LeetCode username/password/cookie tokens need to be saved or configured inside the extension**.
-*   **📂 Customizable Folder Structure:** Organize your repository using a dynamic path template (e.g., `solutions/{slug}`). Files created include:
-    *   `{slug}.{ext}`: The solution file in the correct extension.
-    *   `README.md`: A beautiful summary including Title, Difficulty, Problem Link, Runtime, Memory, and Solve Date.
-*   **💾 Local Storage Cache:** Keeps a record of already synced submissions inside `chrome.storage.local` to prevent duplicate Git tree operations and stay within API rate limits.
-*   **🚀 Optimized Sequential Batch Sync:** Chains commits sequentially in memory to completely avoid Git ref conflicts and maximize synchronization speed.
+Open the popup and set:
 
----
+| Setting | Value / purpose |
+| --- | --- |
+| Personal access token | Your restricted GitHub token |
+| Owner | Target GitHub user or organization |
+| Repository | Repository name only, e.g. `leetcode-solutions` |
+| Branch | `main`, or an intended target branch |
+| Path template | `solutions/{slug}`; relative path, no `..` or `.git` segments |
+| Only sync Accepted | Enabled unless you intentionally want latest non-accepted attempts too |
+| Commit email (optional) | Exact verified or noreply address from GitHub Settings → Emails |
 
-## 🛠️ Built With
+The commit author defaults to the **token owner**, not the repository organization. If the user's public email is unavailable, an ID-based GitHub noreply address is used. Set the exact email explicitly if attribution is wrong.
 
-*   **Chrome Extension Manifest V3** (service workers and secure origin scoping)
-*   **JavaScript (ES2023)** (native web API implementations)
-*   **GitHub Git Data REST API** (low-level tree, blob, commit, and reference manipulation)
-*   **LeetCode GraphQL API** (official endpoints used by the LeetCode frontend)
-*   **Chrome Storage API** (for local caching of sync states)
-*   **Chrome Runtime Messaging** (for seamless IPC between components)
+Click **Save**, then **Sync All Submissions**. Keep Chrome and a logged-in LeetCode tab open. Closing the popup is fine, but browser shutdown, tab logout or service-worker interruption can stop a job. Reopen the popup and retry; successful submissions remain cached.
 
----
+### 3. Manual smoke check
 
-## 🔤 Supported Languages
+1. Sync a small account/history into the disposable repository.
+2. Confirm a `solutions/<slug>/<slug>.<ext>` file contains your actual solution and its README has the expected problem link and date.
+3. Run bulk sync again: unchanged submissions should be skipped.
+4. Submit a new accepted solution in LeetCode and verify one automatic commit.
+5. With Accepted-only enabled, a failed submission must not create a commit.
+6. Switch to another test repository: it should not reuse the first repository's cache.
+7. Verify commit attribution on GitHub. Do not paste your token into logs, screenshots or issues.
 
-LeetSync automatically detects the language and writes the file with the correct extension. Supported languages include:
-*   C++ (`.cpp`)
-*   Java (`.java`)
-*   Python & Python3 (`.py`)
-*   JavaScript (`.js`)
-*   TypeScript (`.ts`)
-*   Go (`.go`)
-*   Rust (`.rs`)
-*   Kotlin (`.kt`)
-*   Swift (`.swift`)
-*   C# (`.cs`)
-*   PHP (`.php`)
-*   Ruby (`.rb`)
-*   Scala (`.scala`)
-*   Dart (`.dart`)
-*   SQL (MySQL, MS SQL, Oracle SQL) (`.sql`)
-*   *and every other language supported by LeetCode.*
-
----
-
-## 🛠️ How it Works Under the Hood
+## Architecture
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant U as User
-    participant P as Popup (popup.js)
-    participant B as Service Worker (background.js)
-    participant C as Content Script (content.js)
-    participant L as LeetCode API
-    participant G as GitHub API
-
-    U->>P: Clicks "Sync All Submissions"
-    P->>B: Sends "START_SYNC" message
-    B->>C: Initializes communication
-    Note over C,L: Uses page cookies automatically
-    C->>L: Queries graphql (submissionList)
-    L-->>C: Returns paginated submissions
-    C-->>B: Sends normalized submission array
-    Note over B: Filters newest Accepted solve per problem
-    Note over B: Sorts problems oldest-to-newest
-    loop For each unsynced submission
-        B->>C: Requests details for submission ID
-        C->>L: Queries graphql (submissionDetails)
-        L-->>C: Returns code, stats, difficulty
-        C-->>B: Sends detail payload
-        B->>G: Generates Git Blobs (Code & README)
-        G-->>B: Returns Blob SHAs
-        B->>G: Creates Git Tree (stacked on previous commit)
-        G-->>B: Returns Tree SHA
-        B->>G: Creates Commit (Backdated to original solve timestamp)
-        G-->>B: Returns Commit SHA
-        B->>G: Updates Branch Reference (Fast-Forward)
-    end
-    B-->>P: Reports sync complete / progress updates
+flowchart TD
+  P[Popup: settings and progress] --> W[Service worker: serialized sync queue]
+  W <-->|Extension messages| C[Content script in LeetCode tab]
+  C <-->|Session-authenticated GraphQL| L[LeetCode]
+  W -->|Git Data API| G[GitHub repository]
+  W -.->|Optional counts only| T[Express dashboard + SQLite]
 ```
 
----
+`content.js` queries LeetCode using the browser session. `background.js` scans pages, keeps one eligible submission per problem, sorts selected submissions by time and uploads them sequentially. `popup.js` stores settings and reads progress from extension storage.
 
-## 📂 Repository Structure Created
+For each problem, the GitHub sequence is:
 
-By default, the extension saves solutions under the `solutions/{problem-slug}/` directory:
+1. Resolve the target branch and its base tree.
+2. Create two UTF-8 blobs: solution and README.
+3. Create a tree based on the existing tree, preserving unrelated files.
+4. Create a commit with that tree, its parent and the selected submission date.
+5. Update the branch with `force: false`.
+6. Cache success **only after** the branch update succeeds.
 
-```
-leetcode-solutions-repo/
-├── README.md               # Base repository README (auto-initialized if empty)
-└── solutions/
-    ├── two-sum/
-    │   ├── two-sum.py      # Your code in the respective language
-    │   └── README.md       # Problem metadata, stats, & LeetCode link
-    └── add-two-numbers/
-        ├── add-two-numbers.cpp
-        └── README.md
-```
+An empty repository is initialized with a README. A missing branch in a populated repository starts from its default branch. A conflicting branch update stops safely; resolve/retry instead of overwriting another commit.
 
-### Problem README Format
-Each solution folder contains a clean Markdown file with details:
-```markdown
-# Two Sum
+### Example output
 
-- Difficulty: Easy
-- LeetCode problem: https://leetcode.com/problems/two-sum/
-- Language: python3
-- Runtime: 32 ms
-- Memory: 17.6 MB
-- Solved: 2026-05-14
+```text
+solutions/
+  two-sum/
+    two-sum.py
+    README.md
+  add-two-numbers/
+    add-two-numbers.cpp
+    README.md
 ```
 
----
+The extension maps common LeetCode language slugs (Python, C++, Java, JavaScript, TypeScript, Go, Rust, SQL and others) to extensions. Unknown slugs use `.txt`. It stores the **latest selected solution**, not every attempt or the first time you solved each problem. A later language switch may leave the earlier language's file in the folder.
 
-## 🚀 Installation & Setup
+## Optional dashboard
 
-### 1. Load the Chrome Extension
-1. Download or clone this directory to your local computer.
-2. Open Google Chrome and navigate to `chrome://extensions`.
-3. Enable **Developer mode** using the toggle in the top-right corner.
-4. Click **Load unpacked** (top-left) and select this extension folder.
+The dashboard shows reported sync actions, distinct target owners and summed problem counts. These are **client-reported telemetry**, not audited user or unique-problem counts. Resetting and syncing again can increase totals.
 
-### 2. Prepare Your GitHub Repository
-1. Create a repository on GitHub (e.g., `leetcode-solutions`). It can be private or public.
-2. Generate a **GitHub Personal Access Token (PAT)**:
-   * Go to **GitHub** → **Settings** → **Developer settings** → **Personal access tokens** → **Fine-grained tokens** (Recommended) or **Tokens (classic)**.
-   * **Fine-grained Token settings:**
-     * Repository access: Select **Only select repositories** → Choose your solutions repo.
-     * Permissions: Grant **Contents: Read and write** permission.
-   * **Classic Token settings:**
-     * Scopes: Select the `repo` scope.
+### Run on your computer
 
-### 3. Configure the Extension Popup
-1. Click the **LeetSync** puzzle icon in your Chrome toolbar.
-2. Fill in the configuration details:
-   * **Personal Access Token:** Paste your generated GitHub token.
-   * **Owner:** Your GitHub username (or organization name).
-   * **Repository:** The name of your solutions repository.
-   * **Branch:** The default branch (usually `main`).
-   * **Path Template:** The directory structure. `solutions/{slug}` represents `solutions/problem-name/`.
-   * **Only sync Accepted:** (Enabled by default) Only copies submissions with the "Accepted" status.
-3. The popup validates your username and repository status in real-time, displaying green checkmarks once valid credentials are provided.
+From the repository root:
 
----
+```bash
+cd backend
+npm ci
+```
 
-## ⚡ Syncing Methods
+Create `backend/.env` with local values:
 
-### Method A: Bulk Historical Sync
-1. Open a browser tab, navigate to `https://leetcode.com`, and ensure you are **logged in**.
-2. Open the **LeetSync** extension popup.
-3. Click **Sync All Submissions**.
-4. You will see a live progress bar. You can safely close the popup; the synchronization process runs entirely in the background service worker. Reopening the popup will restore the active progress indicators.
+```dotenv
+NODE_ENV=development
+HOST=127.0.0.1
+PORT=3000
+DB_PATH=./telemetry.db
+ADMIN_USER=admin
+ADMIN_PASSWORD=choose-a-long-random-password
+TELEMETRY_KEY=choose-a-different-random-key
+```
 
-### Method B: Real-Time Auto-Sync
-Once setup is complete, you don't need to manually trigger synchronization.
-1. Solve any problem on `leetcode.com`.
-2. Click **Submit** or press `Ctrl + Enter` / `Cmd + Enter`.
-3. The extension detects the submission, waits for LeetCode to finish judging, and automatically commits the solution to your GitHub repository in the background.
+Run from `backend` (Node.js 22+):
 
----
+```bash
+node --env-file=.env server.js
+```
 
-## ⚙️ Configuration Fields Explained
+Open `http://localhost:3000` and enter the admin credentials in the browser's login prompt. `http://localhost:3000/health` should return `{"status":"ok"}`. `npm start` is also available when your shell or host has already supplied the environment variables; it does not read `.env` automatically.
 
-| Field | Default Value | Description |
-| :--- | :--- | :--- |
-| **Personal Access Token** | *Required* | Authentication credential for GitHub API. Needs write access to repository contents. |
-| **Owner** | *Required* | Your GitHub username or organization name. |
-| **Repository** | *Required* | The target repository name. |
-| **Branch** | `main` | The target branch. Will be auto-bootstrapped if empty. |
-| **Path Template** | `solutions/{slug}` | The directory path template where `{slug}` represents the LeetCode URL slug. |
-| **Only sync Accepted** | `Checked` | When unchecked, LeetSync will copy your latest solution of any status (e.g., Wrong Answer, Time Limit Exceeded). |
+In the extension, expand **Commit identity & optional telemetry**, enable reporting, enter `http://localhost:3000` and the matching `TELEMETRY_KEY`, then click **Save**. Run a successful sync to populate the dashboard. Never use your GitHub PAT as this key.
 
----
+### API contract
 
-## 📁 Extension File Hierarchy
+| Endpoint | Access | Purpose |
+| --- | --- | --- |
+| `GET /health` | Public | Database connectivity check |
+| `POST /api/telemetry` | `X-Telemetry-Key` | Validated sync event; disabled without a key |
+| `GET /api/stats` | Admin Basic auth | Aggregate reported counts |
+| `GET /api/logs` | Admin Basic auth | Latest 200 events |
+| `GET /` | Admin Basic auth | Dashboard |
 
-*   [`manifest.json`](file:///home/shashank/Desktop/lc-github-sync-extension/lc-github-sync/manifest.json): Extension configuration, declarations, script mappings, and domain permissions.
-*   [`popup.html`](file:///home/shashank/Desktop/lc-github-sync-extension/lc-github-sync/popup.html) / [`popup.css`](file:///home/shashank/Desktop/lc-github-sync-extension/lc-github-sync/popup.css): A glassmorphic dashboard UI with configuration fields, real-time input validators, and animated progress tracking.
-*   [`popup.js`](file:///home/shashank/Desktop/lc-github-sync-extension/lc-github-sync/popup.js): Logic for saving settings, fetching live progress logs, and calling validator endpoints.
-*   [`content.js`](file:///home/shashank/Desktop/lc-github-sync-extension/lc-github-sync/content.js): Content script executed in `leetcode.com` origin. Acts as an API bridge utilizing user session cookies, and intercepts submissions.
-*   [`background.js`](file:///home/shashank/Desktop/lc-github-sync-extension/lc-github-sync/background.js): The central service worker. Coordinates paginated history extraction, builds sequential Git trees, backdates commit headers, and throttles API request loops.
+Admin credentials are optional only in local development. Production refuses to start without `ADMIN_USER`, `ADMIN_PASSWORD`, `TELEMETRY_KEY` and `DB_PATH`. Put the production service behind HTTPS; Basic auth must not travel over public plaintext HTTP.
 
----
+## Deployment
 
+### Extension distribution
 
-## 💡 Troubleshooting & Notes
+Load unpacked for your own machine, or package the extension for Chrome Web Store review. Hosting the files on a website does **not** install a Chrome extension. No store publication is included in this repository.
 
-*   **Rate Limiting / Sleep Throttling:** LeetSync includes an intentional built-in throttle delay between commits (~0.4s) to ensure it stays well within GitHub API's abuse rate limits.
-*   **Empty Repositories:** If you sync to a brand-new repository with no files/commits, LeetSync automatically initializes it with a default repository `README.md` first. (The lower-level Git Data API requires at least one commit to exist to reference a branch tip).
-*   **Reset History:** If you change your repository path format or want to force LeetSync to re-upload all code solutions, click **Reset** in the extension popup. This clears your local sync history cache so the next bulk sync pushes all solutions again.
-*   **Tab Origin Warning:** Because the extension utilizes browser cookie isolation, **a tab containing `leetcode.com` must remain open and logged in** during the sync process.
+### Deploy the optional dashboard
+
+Use a single persistent Node/container service (for example, Render or Railway) with HTTPS and an attached persistent disk. An ephemeral/serverless filesystem is unsuitable for this SQLite database.
+
+| Host setting | Value |
+| --- | --- |
+| Repository | `arpitkjaiswal/LeetSync` |
+| Root directory | `backend` |
+| Runtime | Node.js 22+ |
+| Build command | `npm ci --omit=dev` |
+| Start command | `npm start` |
+| Health check | `/health` |
+| Disk mount | `/data` |
+| `DB_PATH` | `/data/telemetry.db` |
+| Other environment | `NODE_ENV=production`, `HOST=0.0.0.0`, admin credentials, telemetry key |
+| Port | Use the host-provided `PORT` |
+
+For Docker, from `backend`:
+
+```bash
+docker build -t leetsync-dashboard .
+docker volume create leetsync-data
+docker run --rm -p 3000:3000 \
+  --env-file .env \
+  -e NODE_ENV=production -e HOST=0.0.0.0 \
+  -e DB_PATH=/data/telemetry.db \
+  -v leetsync-data:/data leetsync-dashboard
+```
+
+Store credentials in the hosting provider's secret settings. Provisioning disks or compute may require a paid plan; check before creating resources. Keep one instance for SQLite, arrange database-aware backups, and add collector rate limits/retention before distributing telemetry to many users.
+
+### After deployment
+
+1. Visit `https://YOUR_HOST/health`, then log in to `/` with admin credentials.
+2. Confirm `/api/logs` rejects unauthenticated requests.
+3. In the popup, set the dashboard HTTPS origin and telemetry key; enable reporting and click **Save**. Chrome asks permission for that specific host.
+4. Optionally set server `CORS_ORIGINS` to your `chrome-extension://<extension-id>` origin. The dashboard itself uses same-origin requests.
+5. Sync one solution, verify the dashboard event, restart the service and verify it remains.
+6. Test GitHub sync with the dashboard offline: the optional reporting service must not be needed for uploads.
+
+**Deployment status:** no live dashboard URL is configured in this repository. Deployment requires a connected hosting account; a passing CI run is not a deployed service.
+
+## Development and checks
+
+```bash
+# Repository root: no npm install needed
+npm run check
+npm test
+
+# Optional server
+cd backend
+npm ci
+npm test
+```
+
+GitHub Actions runs syntax checks, extension regression tests and real HTTP/SQLite backend tests. Extension tests use mocked browser/API behavior, so browser installation, LeetCode endpoint compatibility and real GitHub write permissions still need the manual smoke check.
+
+| File | Responsibility |
+| --- | --- |
+| [`manifest.json`](manifest.json) | Chrome permissions and script registration |
+| [`background.js`](background.js) | Queue, Git operations, cache, optional telemetry |
+| [`content.js`](content.js) | LeetCode session bridge and submission detection |
+| [`popup.js`](popup.js), [`popup.html`](popup.html), [`popup.css`](popup.css) | Settings and progress UI |
+| [`backend/server.js`](backend/server.js) | Authenticated dashboard and SQLite API |
+| [`tests/`](tests/), [`backend/tests/`](backend/tests/) | Regression coverage |
+
+## Troubleshooting
+
+| Symptom | Check / action |
+| --- | --- |
+| Cannot connect to LeetCode | Sign in, refresh the LeetCode tab after extension installation/update, then retry |
+| GitHub 401 / 403 | Token expiry, repository access, Contents write permission, organization approval or API limits |
+| GitHub 409 / 422 | Target branch changed or branch rules reject the write; inspect the branch and retry |
+| No contribution squares | Verify the exact commit email and GitHub's branch/repository eligibility; dates alone do not guarantee credit |
+| Popup says interrupted | Retry bulk sync; successful writes have been cached |
+| Wrong destination skipped | New destination caches are separate; older global caches are deliberately not reused |
+| Dashboard stays empty | Reporting is opt-in; check URL, key, Chrome host permission and server logs |
+| Server refuses production startup | Supply all required environment values and a writable persistent `DB_PATH` |
+
+**Reset** clears local sync history, not GitHub commits or files. It can cause submissions to be uploaded again. Do not reset while a sync is running.
+
+## Privacy and limitations
+
+- GitHub PAT and settings live in `chrome.storage.local`, restricted to trusted extension contexts. This is not an encrypted vault; protect your browser profile and use least-privilege tokens.
+- LeetCode session cookies stay in the browser; code is read through the signed-in tab and uploaded to your chosen GitHub repository.
+- Optional telemetry sends target owner/repository, action, count, version and server receipt time. No solution code or GitHub token is sent to the dashboard.
+- LeetCode's frontend GraphQL operations and DOM selectors can change. This is an independent project, not a LeetCode or GitHub product.
+- Long jobs are not durably scheduled across browser shutdown. Retry skips confirmed cached writes, but a crash between branch update and cache write can create a duplicate commit on retry.
+- Polling looks at the latest submission; rapid parallel submissions can be missed by auto-sync. Bulk sync reconciles the latest eligible result per problem.
+- API throttling, branch protection, token policies and Chrome service-worker lifecycle still apply.
+- No license file is currently supplied. Add an explicit license before presenting this as freely licensed software.
+
+## References
+
+- [Chrome service-worker lifecycle](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle)
+- [GitHub Git Database API](https://docs.github.com/en/rest/git)
+- [GitHub contribution eligibility](https://docs.github.com/en/account-and-profile/reference/profile-contributions-reference)
+- [Render persistent disks](https://render.com/docs/disks)

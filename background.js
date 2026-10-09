@@ -7,8 +7,8 @@
 //     script (oldest included — this is what makes "old" submissions sync).
 //  3. Keep only the newest Accepted submission per problem.
 //  4. For each, create a backdated commit in the target GitHub repo using
-//     the Git Data API so the contribution graph shows green boxes on the
-//     ORIGINAL solve dates, not just today.
+//     the Git Data API preserving the selected submission date in Git history. GitHub
+//     contribution credit depends on its attribution and branch rules.
 //
 // Progress is written to chrome.storage.local as it goes, so the popup can
 // show live status even if it's closed and reopened mid-sync.
@@ -50,14 +50,20 @@ function sanitizeSlug(slug) {
 
 async function sendTelemetry(owner, repo, action, count) {
   try {
-    const url = "http://localhost:3000/api/telemetry";
+    const config = await getConfig();
+    if (!config?.telemetryEnabled || !config.telemetryUrl || !config.telemetryKey) return;
+    const base = new URL(config.telemetryUrl);
+    if (base.protocol !== "https:" && base.origin !== "http://localhost:3000") return;
+    const url = new URL("/api/telemetry", base).href;
     const version = chrome.runtime.getManifest().version;
     await fetch(url, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-Telemetry-Key": config.telemetryKey
       },
-      body: JSON.stringify({ owner, repo, action, problemsSynced: count, version })
+      body: JSON.stringify({ owner, repo, action, problemsSynced: count, version }),
+      signal: AbortSignal.timeout(5000)
     });
   } catch (err) {
     console.error("Telemetry report failed:", err);
@@ -66,20 +72,59 @@ async function sendTelemetry(owner, repo, action, count) {
 
 async function getConfig() {
   const { config } = await chrome.storage.local.get("config");
-  return config || null;
+  if (!config) return null;
+  config.branch ||= "main";
+  config.pathTemplate ||= "solutions/{slug}";
+  return config;
 }
 
 async function setProgress(progress) {
   await chrome.storage.local.set({ progress });
 }
 
-async function getSyncedMap() {
-  const { syncedProblems } = await chrome.storage.local.get("syncedProblems");
-  return syncedProblems || {};
+function syncScope(config) {
+  return "syncedProblems:" + JSON.stringify([
+    config.owner.toLowerCase(), config.repo.toLowerCase(), config.branch,
+    config.pathTemplate, config.acceptedOnly !== false
+  ]);
 }
 
-async function setSyncedMap(map) {
-  await chrome.storage.local.set({ syncedProblems: map });
+async function getSyncedMap(config) {
+  const key = syncScope(config);
+  return (await chrome.storage.local.get(key))[key] || {};
+}
+
+async function setSyncedMap(config, map) {
+  await chrome.storage.local.set({ [syncScope(config)]: map });
+}
+
+function solutionFolder(config, slug) {
+  if (!slug) throw new Error("Missing problem slug.");
+  const folder = config.pathTemplate.replaceAll("{slug}", slug).replace(/\/+$/, "");
+  if (!folder || folder.startsWith("/") || folder.includes("\\") ||
+      folder.split("/").some(p => !p || p === "." || p === ".." || p === ".git")) {
+    throw new Error("Path template must be a relative folder without dot segments.");
+  }
+  return folder;
+}
+
+async function resolveCommitAuthor(config) {
+  const user = await githubApi("GET", "https://api.github.com/user", config.token);
+  config.authorName = user.name || user.login;
+  config.authorEmail = config.commitEmail || user.email || `${user.id}+${user.login}@users.noreply.github.com`;
+}
+
+// Keep PATs available only to extension pages and the worker, not content scripts.
+chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" }).catch(console.error);
+let syncQueue = Promise.resolve();
+let pendingSyncs = 0;
+function enqueueSync(task) {
+  pendingSyncs++;
+  const next = syncQueue.then(task);
+  syncQueue = next.catch(async err => {
+    await setProgress({ state: "error", message: err.message || "Sync failed." });
+  }).finally(() => { pendingSyncs--; });
+  return syncQueue;
 }
 
 function sleep(ms) {
@@ -195,12 +240,14 @@ function b64EncodeUtf8(str) {
 //   6. PATCH /git/refs/heads/{branch}       → fast-forward the branch
 
 async function githubApi(method, url, token, body = null) {
-  const opts = { method, headers: githubHeaders(token) };
+  const opts = { method, headers: githubHeaders(token), signal: AbortSignal.timeout(25000) };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(url, opts);
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`GitHub ${method} ${url} failed (${res.status}): ${text}`);
+    const error = new Error(`GitHub ${method} ${url} failed (${res.status}): ${text}`);
+    error.status = res.status;
+    throw error;
   }
   return res.json();
 }
@@ -242,8 +289,8 @@ async function createTree(config, baseTreeSha, files) {
 async function createCommit(config, message, treeSha, parentSha, dateISO) {
   const url = `https://api.github.com/repos/${config.owner}/${config.repo}/git/commits`;
   const authorInfo = {
-    name: config.owner,
-    email: `${config.owner}@users.noreply.github.com`,
+    name: config.authorName,
+    email: config.authorEmail,
     date: dateISO
   };
   const body = {
@@ -258,7 +305,7 @@ async function createCommit(config, message, treeSha, parentSha, dateISO) {
 
 async function updateRef(config, sha) {
   const url = `https://api.github.com/repos/${config.owner}/${config.repo}/git/refs/heads/${encodeURIComponent(config.branch)}`;
-  return githubApi("PATCH", url, config.token, { sha, force: true });
+  return githubApi("PATCH", url, config.token, { sha, force: false });
 }
 
 async function createRef(config, sha) {
@@ -277,7 +324,8 @@ async function tryGetBranchRef(config) {
   const url = `https://api.github.com/repos/${config.owner}/${config.repo}/git/ref/heads/${encodeURIComponent(config.branch)}`;
   const res = await fetch(url, {
     method: "GET",
-    headers: githubHeaders(config.token)
+    headers: githubHeaders(config.token),
+    signal: AbortSignal.timeout(25000)
   });
   if (res.status === 404 || res.status === 409) return null;
   if (!res.ok) throw new Error(`GitHub GET ref failed (${res.status}): ${await res.text()}`);
@@ -300,7 +348,8 @@ async function initializeEmptyRepo(config) {
   const res = await fetch(url, {
     method: "PUT",
     headers: githubHeaders(config.token),
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(25000)
   });
   if (!res.ok) {
     const text = await res.text();
@@ -308,6 +357,20 @@ async function initializeEmptyRepo(config) {
   }
   // Give GitHub a moment to finalize the ref
   await sleep(1500);
+}
+
+async function ensureBranch(config) {
+  let ref = await tryGetBranchRef(config);
+  if (ref) return ref;
+  // A missing branch is different from an empty repository. Preserve the
+  // repository's existing history when creating a new target branch.
+  const repo = await githubApi("GET", `https://api.github.com/repos/${config.owner}/${config.repo}`, config.token);
+  const base = repo.default_branch && await tryGetBranchRef({ ...config, branch: repo.default_branch });
+  if (base) await createRef(config, base.object.sha);
+  else await initializeEmptyRepo(config);
+  ref = await tryGetBranchRef(config);
+  if (!ref) throw new Error("Target branch could not be initialized. Check permissions and branch rules.");
+  return ref;
 }
 
 /**
@@ -351,6 +414,8 @@ async function runSync() {
     return;
   }
 
+  solutionFolder(config, "validation");
+  await resolveCommitAuthor(config);
   let tabInfo;
   try {
     tabInfo = await findActiveLeetCodeTab();
@@ -412,7 +477,7 @@ async function runSync() {
   }
 
   const problems = Array.from(bestByProblem.values());
-  const syncedMap = await getSyncedMap();
+  const syncedMap = await getSyncedMap(config);
 
   // Filter out problems whose latest accepted submission we've already pushed.
   const toSync = problems.filter((s) => {
@@ -421,8 +486,13 @@ async function runSync() {
     return !rec || String(rec.submissionId) !== String(s.id);
   });
 
+  if (toSync.length === 0) {
+    await setProgress({ state: "complete", message: "Already up to date. No changes needed.", done: 0, total: 0 });
+    return;
+  }
+
   // Sort oldest-first so commits are in chronological order on the branch.
-  // This makes the contribution graph display correctly.
+  // Contribution visibility is separately governed by GitHub profile rules.
   toSync.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
   // 2. Fetch the current tip and tree once to build the chain sequentially in memory.
@@ -432,12 +502,7 @@ async function runSync() {
   let currentTreeSha = null;
 
   try {
-    let ref = await tryGetBranchRef(config);
-    if (!ref) {
-      await initializeEmptyRepo(config);
-      ref = await tryGetBranchRef(config);
-      if (!ref) throw new Error("Failed to initialize repository — branch still not found after bootstrap.");
-    }
+    const ref = await ensureBranch(config);
     currentTipSha = ref.object.sha;
     const tipCommit = await getCommit(config, currentTipSha);
     currentTreeSha = tipCommit.tree.sha;
@@ -469,9 +534,7 @@ async function runSync() {
       const langSlug = s.lang || (detail.lang && detail.lang.name) || "txt";
       const ext = extFor(langSlug);
       const slug = sanitizeSlug(s.title_slug || "");
-      const folder = (config.pathTemplate
-        ? config.pathTemplate.replace("{slug}", slug)
-        : `solutions/${slug}`).replace(/\/+$/, "");
+      const folder = solutionFolder(config, slug);
       const codePath = `${folder}/${slug}.${ext}`;
       const readmePath = `${folder}/README.md`;
 
@@ -504,8 +567,8 @@ async function runSync() {
 
       await sleep(400); // rate-limit: significantly reduced sleep since we do fewer API calls now!
 
-      syncedMap[slug] = { submissionId: s.id, timestamp: Date.now() };
-      await setSyncedMap(syncedMap);
+      syncedMap[slug] = { submissionId: s.id, submissionTimestamp: Number(s.timestamp), timestamp: Date.now() };
+      await setSyncedMap(config, syncedMap);
 
       done += 1;
       await setProgress({
@@ -516,6 +579,10 @@ async function runSync() {
       });
     } catch (err) {
       errors += 1;
+      if ([401, 403, 409, 422, 429].includes(err.status)) {
+        await setProgress({ state: "error", message: `${err.message} Sync stopped safely. Resolve access/rate limits or concurrent branch changes, then retry.`, done, total: toSync.length });
+        return;
+      }
       await setProgress({
         state: "running",
         message: `Error syncing "${s.title}": ${err.message}`,
@@ -527,7 +594,7 @@ async function runSync() {
   }
 
   await setProgress({
-    state: "complete",
+    state: errors ? "error" : "complete",
     message: `Done. ${done} problem(s) synced${errors ? `, ${errors} error(s)` : ""}. ${
       problems.length - toSync.length
     } already up to date.`,
@@ -547,6 +614,13 @@ async function syncSingleSubmission(s, senderTabId) {
       return;
     }
 
+    if (!s || (config.acceptedOnly !== false && s.status_display !== "Accepted")) return;
+    const slugKey = sanitizeSlug(s.title_slug || "");
+    solutionFolder(config, slugKey);
+    const previous = (await getSyncedMap(config))[slugKey];
+    if (previous && (String(previous.submissionId) === String(s.id) ||
+        previous.submissionTimestamp > Number(s.timestamp))) return;
+    await resolveCommitAuthor(config);
     let tabId = senderTabId;
     if (!tabId) {
       const tabInfo = await findActiveLeetCodeTab().catch(() => null);
@@ -557,12 +631,7 @@ async function syncSingleSubmission(s, senderTabId) {
     }
 
     // 1. Get current branch tip (null if repo is empty)
-    let ref = await tryGetBranchRef(config);
-    if (!ref) {
-      await initializeEmptyRepo(config);
-      ref = await tryGetBranchRef(config);
-      if (!ref) throw new Error("Failed to initialize repository — branch still not found after bootstrap.");
-    }
+    const ref = await ensureBranch(config);
 
     const tipSha = ref.object.sha;
     const tipCommit = await getCommit(config, tipSha);
@@ -581,9 +650,7 @@ async function syncSingleSubmission(s, senderTabId) {
     const langSlug = s.lang || (detail.lang && detail.lang.name) || "txt";
     const ext = extFor(langSlug);
     const slug = sanitizeSlug(s.title_slug || "");
-    const folder = (config.pathTemplate
-      ? config.pathTemplate.replace("{slug}", slug)
-      : `solutions/${slug}`).replace(/\/+$/, "");
+    const folder = solutionFolder(config, slug);
     const codePath = `${folder}/${slug}.${ext}`;
     const readmePath = `${folder}/README.md`;
 
@@ -616,9 +683,9 @@ async function syncSingleSubmission(s, senderTabId) {
     );
 
     // Save to sync history
-    const syncedMap = await getSyncedMap();
-    syncedMap[slug] = { submissionId: s.id, timestamp: Date.now() };
-    await setSyncedMap(syncedMap);
+    const syncedMap = await getSyncedMap(config);
+    syncedMap[slug] = { submissionId: s.id, submissionTimestamp: Number(s.timestamp), timestamp: Date.now() };
+    await setSyncedMap(config, syncedMap);
 
     await setProgress({
       state: "complete",
@@ -638,25 +705,22 @@ async function syncSingleSubmission(s, senderTabId) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "START_SYNC") {
-    runSync().catch(async (err) => {
-      await setProgress({ state: "error", message: `Unexpected error: ${err.message}` });
-    });
+  if (message.type === "GET_SYNC_STATUS") {
+    sendResponse({ busy: pendingSyncs > 0 });
+  } else if (message.type === "START_SYNC") {
+    if (pendingSyncs) { sendResponse({ ok: false, error: "A sync is already running." }); return; }
+    enqueueSync(runSync);
     sendResponse({ ok: true, started: true });
-    return true;
-  }
-  if (message.type === "RESET_SYNC_STATE") {
-    chrome.storage.local.remove(["syncedProblems", "progress"]).then(() => {
+  } else if (message.type === "RESET_SYNC_STATE") {
+    if (pendingSyncs) { sendResponse({ ok: false, error: "Wait for the current sync before resetting." }); return; }
+    (async () => {
+      const all = await chrome.storage.local.get(null);
+      await chrome.storage.local.remove(Object.keys(all).filter(key => key === "progress" || key === "syncedProblems" || key.startsWith("syncedProblems:")));
       sendResponse({ ok: true });
-    });
+    })().catch(err => sendResponse({ ok: false, error: err.message }));
     return true;
-  }
-  if (message.type === "SYNC_SUBMISSION") {
-    const senderTabId = sender.tab ? sender.tab.id : null;
-    syncSingleSubmission(message.submission, senderTabId).catch((err) => {
-      console.error("Auto-sync background failure:", err);
-    });
+  } else if (message.type === "SYNC_SUBMISSION") {
+    enqueueSync(() => syncSingleSubmission(message.submission, sender.tab?.id));
     sendResponse({ ok: true });
-    return true;
   }
 });

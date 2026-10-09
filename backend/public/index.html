@@ -113,8 +113,10 @@
   <script>
     async function fetchData() {
       try {
+        document.querySelector('.live-indicator span:last-child').textContent = 'Live Telemetry Connection';
         // Fetch stats
         const statsRes = await fetch('/api/stats');
+        if (!statsRes.ok) throw new Error('Dashboard unavailable: HTTP ' + statsRes.status);
         const stats = await statsRes.json();
         document.getElementById('totalUsers').textContent = stats.totalUsers;
         document.getElementById('totalSyncs').textContent = stats.totalSyncs;
@@ -122,6 +124,7 @@
 
         // Fetch logs
         const logsRes = await fetch('/api/logs');
+        if (!logsRes.ok) throw new Error('Logs unavailable: HTTP ' + logsRes.status);
         const logs = await logsRes.json();
         
         const logBody = document.getElementById('logBody');
@@ -148,6 +151,7 @@
 
       } catch (err) {
         console.error('Error fetching data:', err);
+        document.querySelector('.live-indicator span:last-child').textContent = 'Connection unavailable';
       }
     }
 
@@ -167,7 +171,7 @@
         const ownerTd = document.createElement('td');
         ownerTd.innerHTML = `
           <div class="user-cell">
-            <span class="user-avatar">${log.owner.substring(0, 2).toUpperCase()}</span>
+            <span class="user-avatar">${escapeHtml(log.owner.substring(0, 2).toUpperCase())}</span>
             <a href="https://github.com/${encodeURIComponent(log.owner)}" target="_blank" class="owner-link">@${escapeHtml(log.owner)}</a>
           </div>
         `;
@@ -194,7 +198,7 @@
         // Date Cell
         const dateTd = document.createElement('td');
         dateTd.className = 'date-cell';
-        const dateObj = new Date(log.timestamp);
+        const dateObj = new Date(log.timestamp.replace(" ", "T") + "Z");
         dateTd.textContent = dateObj.toLocaleString();
 
         tr.appendChild(ownerTd);

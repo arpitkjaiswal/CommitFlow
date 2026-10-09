@@ -11,6 +11,10 @@ async function loadConfig() {
   $("branch").value = config.branch || "main";
   $("pathTemplate").value = config.pathTemplate || "solutions/{slug}";
   $("acceptedOnly").checked = config.acceptedOnly !== false;
+  $("commitEmail").value = config.commitEmail || "";
+  $("telemetryEnabled").checked = config.telemetryEnabled === true;
+  $("telemetryUrl").value = config.telemetryUrl || "";
+  $("telemetryKey").value = config.telemetryKey || "";
 }
 
 function readConfigFromForm() {
@@ -20,12 +24,27 @@ function readConfigFromForm() {
     repo: $("repo").value.trim(),
     branch: $("branch").value.trim() || "main",
     pathTemplate: $("pathTemplate").value.trim() || "solutions/{slug}",
-    acceptedOnly: $("acceptedOnly").checked
+    acceptedOnly: $("acceptedOnly").checked,
+    commitEmail: $("commitEmail").value.trim(),
+    telemetryEnabled: $("telemetryEnabled").checked,
+    telemetryUrl: $("telemetryUrl").value.trim(),
+    telemetryKey: $("telemetryKey").value.trim()
   };
 }
 
 async function saveConfig(silent = false) {
   const config = readConfigFromForm();
+  if (!silent && config.telemetryEnabled) {
+    try {
+      const origin = new URL(config.telemetryUrl).origin;
+      if (origin !== "http://localhost:3000") {
+        if (!origin.startsWith("https://")) throw new Error("Use HTTPS for a hosted dashboard.");
+        const granted = await chrome.permissions.request({ origins: [origin + "/*"] });
+        if (!granted) throw new Error("Dashboard permission was not granted.");
+      }
+      if (!config.telemetryKey) throw new Error("Enter the dashboard telemetry key.");
+    } catch (err) { showToast(err.message); return; }
+  }
   await chrome.storage.local.set({ config });
   if (!silent) showToast("Settings saved ✓");
 }
@@ -238,7 +257,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const { progress } = await chrome.storage.local.get("progress");
   if (progress) renderProgress(progress);
-  if (progress && progress.state === "running") startPolling();
+  if (progress && progress.state === "running") {
+    chrome.runtime.sendMessage({ type: "GET_SYNC_STATUS" }, response => {
+      if (response?.busy) startPolling();
+      else renderProgress({ state: "error", message: "Previous sync was interrupted. Click Sync All Submissions to retry; completed submissions are cached." });
+    });
+  }
 
   // Save button
   $("saveBtn").addEventListener("click", () => saveConfig());
@@ -248,7 +272,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     await saveConfig(true);
     setStatus("Starting sync…");
     updateBadge("running");
-    chrome.runtime.sendMessage({ type: "START_SYNC" }, () => {
+    chrome.runtime.sendMessage({ type: "START_SYNC" }, response => {
+      if (!response?.ok) { setStatus(response?.error || "Could not start sync.", "error"); return; }
       startPolling();
     });
   });
@@ -256,7 +281,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Reset button
   $("resetBtn").addEventListener("click", async () => {
     if (!confirm("This clears local sync history so every problem will be re-pushed to GitHub next sync. Continue?")) return;
-    chrome.runtime.sendMessage({ type: "RESET_SYNC_STATE" }, () => {
+    chrome.runtime.sendMessage({ type: "RESET_SYNC_STATE" }, response => {
+      if (!response?.ok) { showToast(response?.error || "Reset failed."); return; }
       showToast("Sync history cleared");
       setProgress(0);
       setStatus("");
@@ -265,7 +291,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Auto-save on every input change
-  const inputs = ["token", "owner", "repo", "branch", "pathTemplate", "acceptedOnly"];
+  const inputs = ["token", "owner", "repo", "branch", "pathTemplate", "acceptedOnly", "commitEmail", "telemetryEnabled", "telemetryUrl", "telemetryKey"];
   inputs.forEach(id => {
     $(id).addEventListener("input", () => {
       saveConfig(true);
