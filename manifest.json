@@ -1,9 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "LeetSync — LeetCode → GitHub",
-  "version": "1.0.0",
+  "name": "LeetSync \u2014 LeetCode \u2192 GitHub",
+  "version": "1.0.1",
   "description": "Syncs your entire LeetCode submission history (old and new) to a GitHub repository.",
-  "permissions": ["storage", "tabs", "webRequest"],
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
   "host_permissions": [
     "https://leetcode.com/*",
     "https://api.github.com/*",
@@ -15,12 +18,11 @@
     "128": "icons/icon128.png"
   },
   "background": {
-    "scripts": ["background.js"],
     "service_worker": "background.js"
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "LeetSync — LeetCode → GitHub",
+    "default_title": "LeetSync \u2014 LeetCode \u2192 GitHub",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -29,9 +31,17 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://leetcode.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://leetcode.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
+  ],
+  "minimum_chrome_version": "110",
+  "optional_host_permissions": [
+    "https://*/*"
   ]
 }
