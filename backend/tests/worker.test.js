@@ -110,7 +110,7 @@ test("dashboard routes and static assets require admin basic auth", async () => 
   const bindings = env();
   const denied = await handleRequest(new Request("https://example.workers.dev/api/stats"), bindings);
   assert.equal(denied.status, 401);
-  assert.match(denied.headers.get("WWW-Authenticate"), /LeetSync dashboard/);
+  assert.match(denied.headers.get("WWW-Authenticate"), /CommitFlow dashboard/);
 
   const headers = { Authorization: basic("admin", "dashboard-password") };
   const stats = await handleRequest(new Request("https://example.workers.dev/api/stats", { headers }), bindings);
