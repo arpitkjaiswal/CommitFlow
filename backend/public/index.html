@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LeetSync — Admin Telemetry Dashboard</title>
+  <title>CommitFlow — Meta &amp; Apple Interview Prep</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -22,15 +22,36 @@
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
         </svg>
         <div class="brand-text">
-          <h1>LeetSync</h1>
-          <span>Telemetry Dashboard</span>
+          <h1>CommitFlow</h1>
+          <span>Meta &amp; Apple Interview Prep</span>
         </div>
       </div>
       <div class="live-indicator">
         <span class="pulse-dot"></span>
-        <span>Live Telemetry Connection</span>
+        <span>Dashboard Online</span>
       </div>
     </header>
+
+    <section class="profile-card" aria-labelledby="profile-snapshot-title">
+      <div class="profile-title-row">
+        <div>
+          <p class="profile-eyebrow">PUBLIC PROFILE · SNAPSHOT 10 OCT 2026</p>
+          <h2 id="profile-snapshot-title">LeetCode progress</h2>
+        </div>
+        <a class="profile-link" href="https://leetcode.com/u/Arpitkumarjaiswal/" target="_blank" rel="noopener noreferrer">View profile ↗</a>
+      </div>
+      <div class="profile-metrics">
+        <div class="profile-metric"><span>Problems solved</span><strong>200 <small>of 4,073</small></strong></div>
+        <div class="profile-metric"><span>Acceptance</span><strong>73.21%</strong></div>
+        <div class="profile-metric"><span>Contest rating</span><strong>1,435</strong></div>
+      </div>
+      <div class="profile-difficulty" aria-label="Problems solved by difficulty">
+        <div><span>Easy</span><strong>66</strong></div>
+        <div><span>Medium</span><strong>111</strong></div>
+        <div><span>Hard</span><strong>23</strong></div>
+      </div>
+      <p class="profile-footnote">486 submissions in the past year · 153 active days · 73-day maximum streak</p>
+    </section>
 
     <!-- Stats Summary Cards -->
     <section class="stats-grid">
@@ -113,7 +134,7 @@
   <script>
     async function fetchData() {
       try {
-        document.querySelector('.live-indicator span:last-child').textContent = 'Live Telemetry Connection';
+        document.querySelector('.live-indicator span:last-child').textContent = 'Dashboard Online';
         // Fetch stats
         const statsRes = await fetch('/api/stats');
         if (!statsRes.ok) throw new Error('Dashboard unavailable: HTTP ' + statsRes.status);
