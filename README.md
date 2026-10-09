@@ -164,6 +164,23 @@ Admin credentials are optional only in local development. Production refuses to 
 
 Load unpacked for your own machine, or package the extension for Chrome Web Store review. Hosting the files on a website does **not** install a Chrome extension. No store publication is included in this repository.
 
+### Deploy with the Render button
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/arpitkjaiswal/LeetSync)
+
+The included [render.yaml](render.yaml) provisions **one paid Node service and a 1 GB persistent disk**. Review Render's displayed charges before approving; clicking the button opens the review screen and does not mean deployment has completed.
+
+1. Sign in to Render, connect this repository if prompted, and review the Blueprint.
+2. Approve the service and disk only if you accept the displayed price.
+3. Wait until the service is Live. Open its assigned HTTPS URL and check `/health`.
+4. In the service's **Environment** settings, retrieve the generated `ADMIN_PASSWORD`. Sign into the dashboard as `admin`.
+5. Retrieve the separate generated `TELEMETRY_KEY`. In the extension, enable telemetry, enter the service's HTTPS origin and that key, then click Save and grant host access.
+6. Run a successful sync and verify an event in the dashboard. Restart the service and confirm the event remains.
+
+The Blueprint sets `DB_PATH=/var/data/telemetry.db`; the other manual examples below use `/data`. Both work when the path is inside the configured persistent disk. Automatic redeploys are off; after future code updates, use Render's Manual Deploy. Do not share generated secrets or substitute your GitHub token for the telemetry key.
+
+No hosting resources are created merely by merging the Blueprint. The extension still needs to be installed in Chrome and used with a signed-in LeetCode tab.
+
 ### Deploy the optional dashboard
 
 Use a single persistent Node/container service (for example, Render or Railway) with HTTPS and an attached persistent disk. An ephemeral/serverless filesystem is unsuitable for this SQLite database.

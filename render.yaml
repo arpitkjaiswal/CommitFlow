@@ -1,0 +1,31 @@
+# Paid web service + 1 GB persistent disk. Review Render's price before approval.
+services:
+  - type: web
+    name: leetsync-dashboard
+    runtime: node
+    plan: 0.5c-512mb
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    numInstances: 1
+    disk:
+      name: leetsync-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DB_PATH
+        value: /var/data/telemetry.db
+      - key: ADMIN_USER
+        value: admin
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: TELEMETRY_KEY
+        generateValue: true
