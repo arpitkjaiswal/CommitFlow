@@ -341,8 +341,8 @@ async function tryGetBranchRef(config) {
 async function initializeEmptyRepo(config) {
   const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/README.md`;
   const body = {
-    message: "Initial commit — LeetSync",
-    content: b64EncodeUtf8("# My LeetCode Solutions\n\nSynced with [LeetSync](https://github.com).\n"),
+    message: "Initial commit — CommitFlow",
+    content: b64EncodeUtf8("# My LeetCode Solutions\n\nSynced with [CommitFlow](https://github.com/arpitkjaiswal/CommitFlow).\n"),
     branch: config.branch
   };
   const res = await fetch(url, {

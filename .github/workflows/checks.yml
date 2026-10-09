@@ -1,4 +1,4 @@
-name: LeetSync checks
+name: CommitFlow checks
 on:
   pull_request:
   push:

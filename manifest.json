@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "LeetSync \u2014 LeetCode \u2192 GitHub",
+  "name": "CommitFlow — LeetCode → GitHub",
   "version": "1.0.1",
-  "description": "Syncs your entire LeetCode submission history (old and new) to a GitHub repository.",
+  "description": "Syncs LeetCode submissions with a GitHub repository.",
   "permissions": [
     "storage",
     "tabs"
@@ -22,7 +22,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "LeetSync \u2014 LeetCode \u2192 GitHub",
+    "default_title": "CommitFlow — LeetCode → GitHub",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
