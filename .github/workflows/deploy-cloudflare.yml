@@ -1,0 +1,66 @@
+name: Deploy dashboard to Cloudflare
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure D1 binding
+        env:
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const id = process.env.D1_DATABASE_ID || "";
+          if (!/^[0-9a-f-]{36}$/i.test(id)) {
+            throw new Error("Set the D1_DATABASE_ID GitHub Actions secret to the Cloudflare D1 database UUID.");
+          }
+          const path = "backend/wrangler.toml";
+          const config = fs.readFileSync(path, "utf8");
+          if (!config.includes("__D1_DATABASE_ID__")) {
+            throw new Error("D1 database placeholder was not found.");
+          }
+          fs.writeFileSync(path, config.replace("__D1_DATABASE_ID__", id));
+          NODE
+
+      - name: Apply schema and create Worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: backend
+          preCommands: wrangler d1 migrations apply leetsync-telemetry --remote
+          command: deploy
+
+      - name: Apply runtime secrets and deploy
+        id: final-deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: backend
+          secrets: |
+            ADMIN_USER
+            ADMIN_PASSWORD
+            TELEMETRY_KEY
+          vars: |
+            CORS_ORIGINS
+          command: deploy
+        env:
+          ADMIN_USER: ${{ secrets.ADMIN_USER }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
+          CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+
+      - name: Report dashboard URL
+        env:
+          DASHBOARD_URL: ${{ steps.final-deploy.outputs.deployment-url }}
+        run: echo "Dashboard is available at ${DASHBOARD_URL}" >> "$GITHUB_STEP_SUMMARY"
+
