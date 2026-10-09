@@ -50,17 +50,13 @@ jobs:
             ADMIN_USER
             ADMIN_PASSWORD
             TELEMETRY_KEY
-          vars: |
-            CORS_ORIGINS
           command: deploy
         env:
           ADMIN_USER: ${{ secrets.ADMIN_USER }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
-          CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
 
       - name: Report dashboard URL
         env:
           DASHBOARD_URL: ${{ steps.final-deploy.outputs.deployment-url }}
         run: echo "Dashboard is available at ${DASHBOARD_URL}" >> "$GITHUB_STEP_SUMMARY"
-
