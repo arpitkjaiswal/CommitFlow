@@ -1,7 +1,7 @@
 # Paid web service + 1 GB persistent disk. Review Render's price before approval.
 services:
   - type: web
-    name: leetsync-dashboard
+    name: commitflow-dashboard
     runtime: node
     plan: 0.5c-512mb
     rootDir: backend

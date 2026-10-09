@@ -145,7 +145,7 @@ async function route(request, env) {
         status: 401,
         headers: {
           "Content-Type": "application/json; charset=utf-8",
-          "WWW-Authenticate": 'Basic realm="LeetSync dashboard", charset="UTF-8"',
+          "WWW-Authenticate": 'Basic realm="CommitFlow dashboard", charset="UTF-8"',
         },
       },
     ), request, env);

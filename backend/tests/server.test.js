@@ -7,7 +7,7 @@ const path = require('node:path');
 const { createApp } = require('../server');
 test('production fails fast without configuration', async () => { await assert.rejects(createApp({ NODE_ENV: 'production' }), /Production requires/); });
 test('HTTP auth, validation and persistent database', async t => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'leetsync-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'commitflow-'));
   const env = { NODE_ENV: 'production', ADMIN_USER: 'admin', ADMIN_PASSWORD: 'test-password', TELEMETRY_KEY: 'collector-key', DB_PATH: path.join(dir, 'data.db') };
   const { app, close } = await createApp(env), server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
   t.after(async () => { await new Promise(r => server.close(r)); await close(); await fs.rm(dir, { recursive: true, force: true }); });

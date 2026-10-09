@@ -72,7 +72,7 @@ async function createApp(env = process.env) {
     const credentials = header.startsWith('Basic ') ? Buffer.from(header.slice(6), 'base64').toString('utf8') : '';
     const separator = credentials.indexOf(':');
     if (separator >= 0 && equalSecret(credentials.slice(0, separator), env.ADMIN_USER) && equalSecret(credentials.slice(separator + 1), env.ADMIN_PASSWORD)) return next();
-    res.set('WWW-Authenticate', 'Basic realm="LeetSync dashboard", charset="UTF-8"');
+    res.set('WWW-Authenticate', 'Basic realm="CommitFlow dashboard", charset="UTF-8"');
     return res.status(401).json({ error: 'Dashboard authentication required.' });
   });
   app.get('/api/stats', async (req, res, next) => {
@@ -98,7 +98,7 @@ async function createApp(env = process.env) {
 if (require.main === module) {
   createApp().then(({ app, close }) => {
     const host = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
-    const server = app.listen(process.env.PORT || 3000, host, () => console.log(`LeetSync listening on ${host}:${server.address().port}`));
+    const server = app.listen(process.env.PORT || 3000, host, () => console.log(`CommitFlow listening on ${host}:${server.address().port}`));
     const shutdown = () => server.close(() => close().then(() => process.exit(0)));
     process.once('SIGTERM', shutdown);
     process.once('SIGINT', shutdown);

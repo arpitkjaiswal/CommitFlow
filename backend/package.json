@@ -1,7 +1,7 @@
 {
-  "name": "leetsync-backend",
+  "name": "commitflow-backend",
   "version": "1.0.0",
-  "description": "Telemetry and usage tracking server for LeetSync",
+  "description": "Meta and Apple interview prep dashboard backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
