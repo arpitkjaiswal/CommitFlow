@@ -28,5 +28,6 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      - run: node --check worker.mjs
       - run: npm test
       - run: npm audit --omit=dev
