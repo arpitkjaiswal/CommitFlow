@@ -1,7 +1,7 @@
 {
   "name": "commitflow-backend",
   "version": "1.0.0",
-  "description": "Meta and Apple interview prep dashboard backend",
+  "description": "Optional CommitFlow dashboard backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

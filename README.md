@@ -1,294 +1,147 @@
-<p align="center"><img src="icons/icon128.png" width="88" alt="LeetSync logo" /></p>
-<h1 align="center">LeetSync</h1>
-<p align="center"><strong>Your LeetCode solutions, organized in GitHub.</strong><br />A Chrome extension for historical imports and automatic submission sync.</p>
-<p align="center">
-  <a href="https://github.com/arpitkjaiswal/LeetSync/actions/workflows/checks.yml"><img alt="Checks" src="https://github.com/arpitkjaiswal/LeetSync/actions/workflows/checks.yml/badge.svg" /></a>
-  <img alt="Chrome Manifest V3" src="https://img.shields.io/badge/Chrome-Manifest_V3-4285F4" />
-  <img alt="JavaScript" src="https://img.shields.io/badge/JavaScript-vanilla-F7DF1E" />
-</p>
+# CommitFlow
 
-[Quick start](#quick-start) · [Architecture](#architecture) · [Optional dashboard](#optional-dashboard) · [Deployment](#deployment) · [Troubleshooting](#troubleshooting)
+Keep your LeetCode solutions in GitHub, with a commit trail you can browse.
+
+CommitFlow is a Chrome extension that imports your LeetCode submissions into a GitHub repository you choose. An optional dashboard shows sync activity you choose to share. The extension works without the dashboard.
+
+[![Checks](https://github.com/arpitkjaiswal/CommitFlow/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/arpitkjaiswal/CommitFlow/actions/workflows/checks.yml) ![Chrome Manifest V3](https://img.shields.io/badge/Chrome-Manifest_V3-4285F4) ![JavaScript](https://img.shields.io/badge/JavaScript-vanilla-F7DF1E)
 
 ## What it does
 
-- Scans your LeetCode history and selects the **latest accepted submission per problem** by default.
-- Writes a solution file and a problem README in one Git commit, using that submission's timestamp.
-- Detects Submit clicks and Ctrl/Cmd+Enter, polls for a result, then queues automatic sync.
-- Records completed submissions locally, scoped to repository, branch, folder template and acceptance setting.
-- Uses **fast-forward-only** GitHub updates so a concurrent branch change cannot be overwritten.
-- Optionally reports sync counts to your own Express + SQLite dashboard. Telemetry is **off by default**.
+- **Import your history:** scans your LeetCode submissions and syncs the newest accepted solution for each problem by default.
+- **Keep up as you solve:** watches for a LeetCode submission after you click **Submit** or use Ctrl/Cmd+Enter.
+- **Write to your repository:** saves the solution and a small problem README under a folder layout you choose.
+- **Preserve the submission date:** commits use the selected submission timestamp. GitHub contribution credit still depends on your commit email, repository, branch, and GitHub's eligibility rules.
+- **Avoid overwriting branch changes:** pushes are fast-forward only. If the branch changes during a sync, CommitFlow stops and leaves the successful-sync cache untouched for that submission.
+- **Share less by default:** optional telemetry is off until you enable it. It reports sync counts and repository identifiers, never solution code or your GitHub token.
 
-**The extension works without the dashboard.** A hosted dashboard does not install the extension or perform sync in the cloud. Your signed-in LeetCode browser session and a GitHub token are still required.
+## Install the extension
 
-> Status: automated extension regression tests and backend HTTP tests are included. These mock GitHub/Chrome/LeetCode where needed; they do not prove a live authenticated LeetCode-to-GitHub sync. Follow the manual smoke check below before using a valuable destination repository.
-
-## Preview
-
-<p align="center"><img src="assets/popup_ui.png" alt="LeetSync popup screenshot from the original repository" width="720" /></p>
-
-The screenshot predates the additional commit-email and optional telemetry settings.
-
-## Quick start
-
-### 1. Install locally in Chrome
+You need Chrome 110 or newer, a GitHub account, and a signed-in LeetCode tab.
 
 ```bash
-git clone https://github.com/arpitkjaiswal/LeetSync.git
-cd LeetSync
+git clone https://github.com/arpitkjaiswal/CommitFlow.git
+cd CommitFlow
 ```
 
-1. Open `chrome://extensions` and enable **Developer mode**.
-2. Choose **Load unpacked** and select the repository root containing `manifest.json`.
-3. Pin LeetSync, then open or refresh a tab at `https://leetcode.com` and sign in.
+1. Open `chrome://extensions` and turn on **Developer mode**.
+2. Select **Load unpacked** and choose the `CommitFlow` folder containing `manifest.json`.
+3. Pin CommitFlow, open `https://leetcode.com`, and sign in.
+4. In the extension popup, enter a GitHub fine-grained personal access token limited to your destination repository, with **Contents: Read and write** permission.
+5. Enter the repository owner and name, choose a branch and path template, then select **Save**.
+6. Start with a disposable repository and choose **Sync All Submissions** to confirm the result before using a repository you care about.
 
-Use Chrome 110 or newer (prefer a current stable release). The extension has no build step and needs no npm packages. Node.js 22+ is needed only for tests or the optional server.
+For a quick smoke check, verify that the solution and problem README appear in GitHub, then run **Sync All Submissions** again to confirm there are no duplicate writes. Submit one new accepted solution and check that it creates one commit. With **Only sync Accepted** on, a rejected submission should not be committed.
 
-### 2. Prepare GitHub
+The popup settings are:
 
-Create a disposable solutions repository for the first test. Generate a **fine-grained personal access token** restricted to that repository with **Contents: Read and write**. Organization approval and branch rules may still apply.
-
-Open the popup and set:
-
-| Setting | Value / purpose |
+| Setting | What it controls |
 | --- | --- |
-| Personal access token | Your restricted GitHub token |
-| Owner | Target GitHub user or organization |
-| Repository | Repository name only, e.g. `leetcode-solutions` |
-| Branch | `main`, or an intended target branch |
-| Path template | `solutions/{slug}`; relative path, no `..` or `.git` segments |
-| Only sync Accepted | Enabled unless you intentionally want latest non-accepted attempts too |
-| Commit email (optional) | Exact verified or noreply address from GitHub Settings → Emails |
+| Owner / repository | Destination GitHub repository |
+| Branch | Branch to update; defaults to `main` |
+| Path template | Relative folder for each problem; defaults to `solutions/{slug}`. Dot segments and absolute paths are rejected. |
+| Only sync Accepted | When on, choose the newest accepted submission per problem. When off, choose the newest submission regardless of result. |
+| Commit email | Optional exact verified or GitHub noreply email for commit attribution |
+| Dashboard reporting | Optional. Off by default; requires a dashboard URL and separate telemetry key. |
 
-The commit author defaults to the **token owner**, not the repository organization. If the user's public email is unavailable, an ID-based GitHub noreply address is used. Set the exact email explicitly if attribution is wrong.
-
-Click **Save**, then **Sync All Submissions**. Keep Chrome and a logged-in LeetCode tab open. Closing the popup is fine, but browser shutdown, tab logout or service-worker interruption can stop a job. Reopen the popup and retry; successful submissions remain cached.
-
-### 3. Manual smoke check
-
-1. Sync a small account/history into the disposable repository.
-2. Confirm a `solutions/<slug>/<slug>.<ext>` file contains your actual solution and its README has the expected problem link and date.
-3. Run bulk sync again: unchanged submissions should be skipped.
-4. Submit a new accepted solution in LeetCode and verify one automatic commit.
-5. With Accepted-only enabled, a failed submission must not create a commit.
-6. Switch to another test repository: it should not reuse the first repository's cache.
-7. Verify commit attribution on GitHub. Do not paste your token into logs, screenshots or issues.
-
-## Architecture
-
-```mermaid
-flowchart TD
-  P[Popup: settings and progress] --> W[Service worker: serialized sync queue]
-  W <-->|Extension messages| C[Content script in LeetCode tab]
-  C <-->|Session-authenticated GraphQL| L[LeetCode]
-  W -->|Git Data API| G[GitHub repository]
-  W -.->|Optional counts only| T[Express dashboard + SQLite]
-```
-
-`content.js` queries LeetCode using the browser session. `background.js` scans pages, keeps one eligible submission per problem, sorts selected submissions by time and uploads them sequentially. `popup.js` stores settings and reads progress from extension storage.
-
-For each problem, the GitHub sequence is:
-
-1. Resolve the target branch and its base tree.
-2. Create two UTF-8 blobs: solution and README.
-3. Create a tree based on the existing tree, preserving unrelated files.
-4. Create a commit with that tree, its parent and the selected submission date.
-5. Update the branch with `force: false`.
-6. Cache success **only after** the branch update succeeds.
-
-An empty repository is initialized with a README. A missing branch in a populated repository starts from its default branch. A conflicting branch update stops safely; resolve/retry instead of overwriting another commit.
-
-### Example output
+For example, the default path creates:
 
 ```text
 solutions/
-  two-sum/
-    two-sum.py
-    README.md
-  add-two-numbers/
-    add-two-numbers.cpp
-    README.md
+└── two-sum/
+    ├── two-sum.py
+    └── README.md
 ```
 
-The extension maps common LeetCode language slugs (Python, C++, Java, JavaScript, TypeScript, Go, Rust, SQL and others) to extensions. Unknown slugs use `.txt`. It stores the **latest selected solution**, not every attempt or the first time you solved each problem. A later language switch may leave the earlier language's file in the folder.
+The README records the problem link, difficulty, language, runtime, memory, and submission date. Common LeetCode languages receive familiar file extensions; unknown languages use `.txt`.
 
 ## Optional dashboard
 
-The dashboard shows reported sync actions, distinct target owners and summed problem counts. These are **client-reported telemetry**, not audited user or unique-problem counts. Resetting and syncing again can increase totals. The dashboard is branded **CommitFlow**; LeetSync remains the Chrome extension. Its LeetCode progress card is a dated public-profile snapshot.
+The dashboard displays reported sync totals and recent events. Its profile card is a dated snapshot, not live LeetCode data. Dashboard statistics are based on client-reported telemetry and can include repeat syncs; they are not audited user or unique-problem counts.
 
-### Run on your computer
+### Run locally
 
-From the repository root:
+Node.js 22 or newer is required for the dashboard and checks. From the repository root:
 
 ```bash
 cd backend
 npm ci
+cp .env.example .env
 ```
 
-Create `backend/.env` with local values:
-
-```dotenv
-NODE_ENV=development
-HOST=127.0.0.1
-PORT=3000
-DB_PATH=./telemetry.db
-ADMIN_USER=admin
-ADMIN_PASSWORD=choose-a-long-random-password
-TELEMETRY_KEY=choose-a-different-random-key
-```
-
-Run from `backend` (Node.js 22+):
+Edit `.env` and replace the example admin password and telemetry key with separate random values. Start the server:
 
 ```bash
 node --env-file=.env server.js
 ```
 
-Open `http://localhost:3000` and enter the admin credentials in the browser's login prompt. `http://localhost:3000/health` should return `{"status":"ok"}`. `npm start` is also available when your shell or host has already supplied the environment variables; it does not read `.env` automatically.
+Open `http://127.0.0.1:3000`. `/health` should return `{"status":"ok"}`. The dashboard asks for the admin username and password. To send extension telemetry to the local server, set `CORS_ORIGINS` in `.env` to `chrome-extension://<your-extension-id>`, enable reporting in the popup, and use the same `TELEMETRY_KEY` in both places.
 
-In the extension, expand **Commit identity & optional telemetry**, enable reporting, enter `http://localhost:3000` and the matching `TELEMETRY_KEY`, then click **Save**. Run a successful sync to populate the dashboard. Never use your GitHub PAT as this key.
+### Cloudflare deployment
 
-### API contract
+The repository includes a GitHub Actions workflow for Cloudflare Workers and D1. It creates the database schema and deploys the optional dashboard. Set these repository Actions secrets first:
 
-| Endpoint | Access | Purpose |
-| --- | --- | --- |
-| `GET /health` | Public | Database connectivity check |
-| `POST /api/telemetry` | `X-Telemetry-Key` | Validated sync event; disabled without a key |
-| `GET /api/stats` | Admin Basic auth | Aggregate reported counts |
-| `GET /api/logs` | Admin Basic auth | Latest 200 events |
-| `GET /` | Admin Basic auth | Dashboard |
+- `CLOUDFLARE_API_TOKEN` — account-scoped token with **D1: Edit** and **Workers Scripts: Edit**
+- `CLOUDFLARE_ACCOUNT_ID`
+- `D1_DATABASE_ID` — UUID of the D1 database named in `backend/wrangler.toml`
+- `ADMIN_USER`
+- `ADMIN_PASSWORD`
+- `TELEMETRY_KEY`
 
-Admin credentials are optional only in local development. Production refuses to start without `ADMIN_USER`, `ADMIN_PASSWORD`, `TELEMETRY_KEY` and `DB_PATH`. Put the production service behind HTTPS; Basic auth must not travel over public plaintext HTTP.
+If you want the Chrome extension to send telemetry to the Worker, also set the Actions variable `CORS_ORIGINS` to `chrome-extension://<your-extension-id>`. Then run **Deploy dashboard to Cloudflare** from the repository's **Actions** tab. The workflow summary prints the Worker URL.
 
-## Deployment
-
-### Free dashboard hosting (Cloudflare Workers + D1)
-
-This hosts the optional dashboard and telemetry API. The Chrome extension still runs in your browser, and telemetry stays off until enabled in the extension. The Worker serves the existing dashboard files and uses D1 for persistent telemetry storage. Cloudflare’s free plan has usage limits; see [D1 pricing and limits](https://developers.cloudflare.com/d1/platform/pricing/).
-
-1. Create a Cloudflare D1 database named `leetsync-telemetry` and copy its database ID.
-2. Create an account-scoped Cloudflare API token with **Workers Scripts: Edit** and **D1: Edit** permissions.
-3. In the GitHub repository, open **Settings → Secrets and variables → Actions** and add these repository secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`, `ADMIN_USER`, `ADMIN_PASSWORD`, and `TELEMETRY_KEY`. Use separate, randomly generated values for the admin password and telemetry key. Keep these values out of source files.
-4. To enable extension telemetry, add the repository Actions variable `CORS_ORIGINS` with the extension origin from `chrome://extensions`, in the form `chrome-extension://<extension-id>`. Leave it unset if you do not want browser telemetry.
-5. In **Actions**, run **Deploy dashboard to Cloudflare**. The workflow applies the D1 migration, deploys the dashboard, and prints its URL in the run summary.
-6. Check `<worker-url>/health`, then enter the Worker URL and `TELEMETRY_KEY` in the extension’s optional telemetry settings. The dashboard uses `ADMIN_USER` and `ADMIN_PASSWORD` for its browser login prompt.
-
-This free deployment path does not create a paid Render service or persistent disk.
-
-### Extension distribution
-
-Load unpacked for your own machine, or package the extension for Chrome Web Store review. Hosting the files on a website does **not** install a Chrome extension. No store publication is included in this repository.
-
-### Deploy with the Render button
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/arpitkjaiswal/LeetSync)
-
-The included [render.yaml](render.yaml) provisions **one paid Node service and a 1 GB persistent disk**. Review Render's displayed charges before approving; clicking the button opens the review screen and does not mean deployment has completed.
-
-1. Sign in to Render, connect this repository if prompted, and review the Blueprint.
-2. Approve the service and disk only if you accept the displayed price.
-3. Wait until the service is Live. Open its assigned HTTPS URL and check `/health`.
-4. In the service's **Environment** settings, retrieve the generated `ADMIN_PASSWORD`. Sign into the dashboard as `admin`.
-5. Retrieve the separate generated `TELEMETRY_KEY`. In the extension, enable telemetry, enter the service's HTTPS origin and that key, then click Save and grant host access.
-6. Run a successful sync and verify an event in the dashboard. Restart the service and confirm the event remains.
-
-The Blueprint sets `DB_PATH=/var/data/telemetry.db`; the other manual examples below use `/data`. Both work when the path is inside the configured persistent disk. Automatic redeploys are off; after future code updates, use Render's Manual Deploy. Do not share generated secrets or substitute your GitHub token for the telemetry key.
-
-No hosting resources are created merely by merging the Blueprint. The extension still needs to be installed in Chrome and used with a signed-in LeetCode tab.
-
-### Deploy the optional dashboard
-
-Use a single persistent Node/container service (for example, Render or Railway) with HTTPS and an attached persistent disk. An ephemeral/serverless filesystem is unsuitable for this SQLite database.
-
-| Host setting | Value |
-| --- | --- |
-| Repository | `arpitkjaiswal/LeetSync` |
-| Root directory | `backend` |
-| Runtime | Node.js 22+ |
-| Build command | `npm ci --omit=dev` |
-| Start command | `npm start` |
-| Health check | `/health` |
-| Disk mount | `/data` |
-| `DB_PATH` | `/data/telemetry.db` |
-| Other environment | `NODE_ENV=production`, `HOST=0.0.0.0`, admin credentials, telemetry key |
-| Port | Use the host-provided `PORT` |
-
-For Docker, from `backend`:
-
-```bash
-docker build -t leetsync-dashboard .
-docker volume create leetsync-data
-docker run --rm -p 3000:3000 \
-  --env-file .env \
-  -e NODE_ENV=production -e HOST=0.0.0.0 \
-  -e DB_PATH=/data/telemetry.db \
-  -v leetsync-data:/data leetsync-dashboard
-```
-
-Store credentials in the hosting provider's secret settings. Provisioning disks or compute may require a paid plan; check before creating resources. Keep one instance for SQLite, arrange database-aware backups, and add collector rate limits/retention before distributing telemetry to many users.
-
-### After deployment
-
-1. Visit `https://YOUR_HOST/health`, then log in to `/` with admin credentials.
-2. Confirm `/api/logs` rejects unauthenticated requests.
-3. In the popup, set the dashboard HTTPS origin and telemetry key; enable reporting and click **Save**. Chrome asks permission for that specific host.
-4. Optionally set server `CORS_ORIGINS` to your `chrome-extension://<extension-id>` origin. The dashboard itself uses same-origin requests.
-5. Sync one solution, verify the dashboard event, restart the service and verify it remains.
-6. Test GitHub sync with the dashboard offline: the optional reporting service must not be needed for uploads.
-
-**Deployment status:** no live dashboard URL is configured in this repository. Deployment requires a connected hosting account; a passing CI run is not a deployed service.
+The Cloudflare workflow is configured, but a live production URL has not been verified. The Cloudflare free plan has limits; review [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/). The included `render.yaml` is a separate persistent-disk setup and may incur charges; it is not the free Cloudflare path.
 
 ## Development and checks
 
-```bash
-# Repository root: no npm install needed
-npm run check
-npm test
+At the repository root:
 
-# Optional server
-cd backend
-npm ci
+```bash
+npm run check
 npm test
 ```
 
-GitHub Actions runs syntax checks, extension regression tests, real HTTP/SQLite backend tests and a production dependency audit. The reviewed branch passes 11 extension tests and 2 backend tests; its refreshed lockfile reports zero npm vulnerabilities as of 9 October 2026. Extension tests use mocked browser/API behavior, so browser installation, LeetCode endpoint compatibility and real GitHub write permissions still need the manual smoke check.
+For the Node dashboard backend:
 
-| File | Responsibility |
-| --- | --- |
-| [`manifest.json`](manifest.json) | Chrome permissions and script registration |
-| [`background.js`](background.js) | Queue, Git operations, cache, optional telemetry |
-| [`content.js`](content.js) | LeetCode session bridge and submission detection |
-| [`popup.js`](popup.js), [`popup.html`](popup.html), [`popup.css`](popup.css) | Settings and progress UI |
-| [`backend/server.js`](backend/server.js) | Authenticated dashboard and SQLite API |
-| [`tests/`](tests/), [`backend/tests/`](backend/tests/) | Regression coverage |
+```bash
+cd backend
+npm ci
+node --check worker.mjs
+npm test
+npm audit --omit=dev
+```
 
-## Troubleshooting
+GitHub Actions runs these checks on pushes to `main` and pull requests. The extension tests mock Chrome and GitHub behavior; backend tests exercise the HTTP/SQLite server and Cloudflare Worker handler with mocked bindings. They do not replace a real LeetCode-to-GitHub smoke test. LeetCode's GraphQL operations and page selectors can change, so repeat the disposable-repository check after extension updates.
 
-| Symptom | Check / action |
-| --- | --- |
-| Cannot connect to LeetCode | Sign in, refresh the LeetCode tab after extension installation/update, then retry |
-| GitHub 401 / 403 | Token expiry, repository access, Contents write permission, organization approval or API limits |
-| GitHub 409 / 422 | Target branch changed or branch rules reject the write; inspect the branch and retry |
-| No contribution squares | Verify the exact commit email and GitHub's branch/repository eligibility; dates alone do not guarantee credit |
-| Popup says interrupted | Retry bulk sync; successful writes have been cached |
-| Wrong destination skipped | New destination caches are separate; older global caches are deliberately not reused |
-| Dashboard stays empty | Reporting is opt-in; check URL, key, Chrome host permission and server logs |
-| Server refuses production startup | Supply all required environment values and a writable persistent `DB_PATH` |
+## How it works
 
-**Reset** clears local sync history, not GitHub commits or files. It can cause submissions to be uploaded again. Do not reset while a sync is running.
+```mermaid
+flowchart LR
+  Popup[Chrome popup] --> Worker[Extension service worker]
+  Worker <-->|Signed-in browser session| LC[LeetCode]
+  Worker -->|Git Data API| GH[Your GitHub repository]
+  Worker -. optional counts .-> Dashboard[CommitFlow dashboard]
+```
+
+The extension reads LeetCode data through a content script in your signed-in tab. It queues GitHub writes one at a time, builds commits on top of the existing tree, and updates the branch without force-pushing. Sync history is stored in Chrome's local extension storage and scoped to the destination, branch, path template, and Accepted-only setting. Reset clears that local history; it does not delete files or commits from GitHub.
 
 ## Privacy and limitations
 
-- GitHub PAT and settings live in `chrome.storage.local`, restricted to trusted extension contexts. This is not an encrypted vault; protect your browser profile and use least-privilege tokens.
-- LeetCode session cookies stay in the browser; code is read through the signed-in tab and uploaded to your chosen GitHub repository.
-- Optional telemetry sends target owner/repository, action, count, version and server receipt time. No solution code or GitHub token is sent to the dashboard.
-- LeetCode's frontend GraphQL operations and DOM selectors can change. This is an independent project, not a LeetCode or GitHub product.
-- Long jobs are not durably scheduled across browser shutdown. Retry skips confirmed cached writes, but a crash between branch update and cache write can create a duplicate commit on retry.
-- Polling looks at the latest submission; rapid parallel submissions can be missed by auto-sync. Bulk sync reconciles the latest eligible result per problem.
-- API throttling, branch protection, token policies and Chrome service-worker lifecycle still apply.
-- No license file is currently supplied. Add an explicit license before presenting this as freely licensed software.
+- Your GitHub token is stored in Chrome extension storage. This is not an encrypted vault; use a repository-scoped token and protect your browser profile.
+- LeetCode session cookies stay in your browser. The extension reads code in the signed-in LeetCode tab and writes it to the repository you configured.
+- Dashboard reporting is optional. When enabled, the extension sends the target owner and repository, sync action, count, and extension version. It does not send code or your GitHub token.
+- Syncing requires Chrome to remain open with a signed-in LeetCode tab. If a job is interrupted, reopen the popup and retry; confirmed submissions are cached.
+- A backdated commit alone does not guarantee a contribution square. GitHub's attribution and contribution rules apply.
+- There is no production dashboard URL yet, and no automated test can confirm your own LeetCode session or GitHub token.
+- This repository does not currently include a license file.
 
-## References
+## Project files
 
-- [Chrome service-worker lifecycle](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle)
-- [GitHub Git Database API](https://docs.github.com/en/rest/git)
-- [GitHub contribution eligibility](https://docs.github.com/en/account-and-profile/reference/profile-contributions-reference)
-- [Render persistent disks](https://render.com/docs/disks)
+| Path | Purpose |
+| --- | --- |
+| `manifest.json`, `popup.*` | Chrome extension manifest and settings UI |
+| `background.js`, `content.js` | Submission scanning, queue, and GitHub sync |
+| `backend/server.js` | Local Express and SQLite dashboard |
+| `backend/worker.mjs` | Cloudflare Worker API |
+| `backend/migrations/` | D1 schema migrations |
+| `tests/`, `backend/tests/` | Extension and backend regression tests |

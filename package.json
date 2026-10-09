@@ -1,5 +1,5 @@
 {
-  "name": "leetsync-extension",
+  "name": "commitflow-extension",
   "version": "1.0.1",
   "private": true,
   "scripts": { "test": "node --test tests/*.test.js", "check": "node --check background.js && node --check content.js && node --check popup.js" },
