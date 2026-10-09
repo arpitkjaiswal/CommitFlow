@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^6.0.1",
     "cors": "^2.8.5"
   },
   "engines": {
