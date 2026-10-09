@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS telemetry (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner TEXT NOT NULL,
+  repo TEXT NOT NULL,
+  action TEXT NOT NULL,
+  problemsSynced INTEGER DEFAULT 0,
+  version TEXT,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS telemetry_owner_idx ON telemetry(owner);
+

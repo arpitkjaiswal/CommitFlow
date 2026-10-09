@@ -160,6 +160,19 @@ Admin credentials are optional only in local development. Production refuses to 
 
 ## Deployment
 
+### Free dashboard hosting (Cloudflare Workers + D1)
+
+This hosts the optional dashboard and telemetry API. The Chrome extension still runs in your browser, and telemetry stays off until enabled in the extension. The Worker serves the existing dashboard files and uses D1 for persistent telemetry storage. Cloudflare’s free plan has usage limits; see [D1 pricing and limits](https://developers.cloudflare.com/d1/platform/pricing/).
+
+1. Create a Cloudflare D1 database named `leetsync-telemetry` and copy its database ID.
+2. Create an account-scoped Cloudflare API token with **Workers Scripts: Edit** and **D1: Edit** permissions.
+3. In the GitHub repository, open **Settings → Secrets and variables → Actions** and add these repository secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`, `ADMIN_USER`, `ADMIN_PASSWORD`, and `TELEMETRY_KEY`. Use separate, randomly generated values for the admin password and telemetry key. Keep these values out of source files.
+4. To enable extension telemetry, add the repository Actions variable `CORS_ORIGINS` with the extension origin from `chrome://extensions`, in the form `chrome-extension://<extension-id>`. Leave it unset if you do not want browser telemetry.
+5. In **Actions**, run **Deploy dashboard to Cloudflare**. The workflow applies the D1 migration, deploys the dashboard, and prints its URL in the run summary.
+6. Check `<worker-url>/health`, then enter the Worker URL and `TELEMETRY_KEY` in the extension’s optional telemetry settings. The dashboard uses `ADMIN_USER` and `ADMIN_PASSWORD` for its browser login prompt.
+
+This free deployment path does not create a paid Render service or persistent disk.
+
 ### Extension distribution
 
 Load unpacked for your own machine, or package the extension for Chrome Web Store review. Hosting the files on a website does **not** install a Chrome extension. No store publication is included in this repository.
