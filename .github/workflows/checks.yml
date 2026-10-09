@@ -27,10 +27,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - run: npm update --package-lock-only --ignore-scripts
       - run: npm ci
       - run: npm test
       - run: npm audit --omit=dev
-      - name: Export refreshed dependency lock
-        if: always()
-        run: node -e "console.log('LEET_LOCK:' + require('node:zlib').gzipSync(require('node:fs').readFileSync('package-lock.json')).toString('base64'))"

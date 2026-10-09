@@ -219,7 +219,7 @@ npm ci
 npm test
 ```
 
-GitHub Actions runs syntax checks, extension regression tests and real HTTP/SQLite backend tests. Extension tests use mocked browser/API behavior, so browser installation, LeetCode endpoint compatibility and real GitHub write permissions still need the manual smoke check.
+GitHub Actions runs syntax checks, extension regression tests, real HTTP/SQLite backend tests and a production dependency audit. The reviewed branch passes 11 extension tests and 2 backend tests; its refreshed lockfile reports zero npm vulnerabilities as of 9 October 2026. Extension tests use mocked browser/API behavior, so browser installation, LeetCode endpoint compatibility and real GitHub write permissions still need the manual smoke check.
 
 | File | Responsibility |
 | --- | --- |
