@@ -14,13 +14,13 @@ jobs:
 
       - name: Configure D1 binding
         env:
-          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID || vars.D1_DATABASE_ID }}
         run: |
           node <<'NODE'
           const fs = require("node:fs");
           const id = process.env.D1_DATABASE_ID || "";
           if (!/^[0-9a-f-]{36}$/i.test(id)) {
-            throw new Error("Set the D1_DATABASE_ID GitHub Actions secret to the Cloudflare D1 database UUID.");
+            throw new Error("Set D1_DATABASE_ID as a GitHub Actions secret or variable to the Cloudflare D1 database UUID.");
           }
           const path = "backend/wrangler.toml";
           const config = fs.readFileSync(path, "utf8");
@@ -63,4 +63,3 @@ jobs:
         env:
           DASHBOARD_URL: ${{ steps.final-deploy.outputs.deployment-url }}
         run: echo "Dashboard is available at ${DASHBOARD_URL}" >> "$GITHUB_STEP_SUMMARY"
-
