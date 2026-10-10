@@ -126,6 +126,10 @@ test("dashboard routes and static assets require admin basic auth", async () => 
   assert.equal(await page.text(), "<html>dashboard</html>");
   assert.equal(page.headers.get("X-Frame-Options"), "DENY");
   assert.equal(page.headers.get("Cache-Control"), "no-store");
+  assert.match(page.headers.get("Content-Security-Policy"), /default-src 'self'/);
+  assert.equal(page.headers.get("Referrer-Policy"), "strict-origin-when-cross-origin");
+  assert.equal(page.headers.get("Permissions-Policy"), "camera=(), geolocation=(), microphone=()");
+  assert.equal(page.headers.get("Strict-Transport-Security"), "max-age=31536000");
 });
 
 test("preflight allows configured extension origin and withholds CORS for others", async () => {
