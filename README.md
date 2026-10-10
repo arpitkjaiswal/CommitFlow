@@ -89,7 +89,7 @@ Before the first deployment, create a **time-limited** Cloudflare API token with
 - `ADMIN_PASSWORD`
 - `TELEMETRY_KEY`
 
-Use separate random values for the admin password and telemetry key; do not reuse or post them in chat. If the Chrome extension should send telemetry, set the Actions variable `CORS_ORIGINS` to `chrome-extension://<your-extension-id>`. Then run **Deploy dashboard to Cloudflare Pages** from the repository's **Actions** tab. After the smoke check passes, set the dashboard URL in the extension to the Pages URL above.
+Use separate random values of at least 32 bytes for the admin password and telemetry key; do not reuse or post them in chat. If the Chrome extension should send telemetry, set the Actions variable `CORS_ORIGINS` to `chrome-extension://<your-extension-id>`. Then run **Deploy dashboard to Cloudflare Pages** from the repository's **Actions** tab. After the smoke check passes, set the dashboard URL in the extension to the Pages URL above.
 
 Cloudflare's free plan has limits; review [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/). The included `render.yaml` is a separate persistent-disk setup and may incur charges; it is not the free Cloudflare path.
 
@@ -133,7 +133,7 @@ The extension reads LeetCode data through a content script in your signed-in tab
 - Dashboard reporting is optional. When enabled, the extension sends the target owner and repository, sync action, count, and extension version. It does not send code or your GitHub token.
 - Syncing requires Chrome to remain open with a signed-in LeetCode tab. If a job is interrupted, reopen the popup and retry; confirmed submissions are cached.
 - A backdated commit alone does not guarantee a contribution square. GitHub's attribution and contribution rules apply.
-- There is no production dashboard URL yet, and no automated test can confirm your own LeetCode session or GitHub token.
+- The production dashboard host is `https://commitflow-dashboard.pages.dev` after the deployment workflow succeeds. Automated checks cannot validate your own LeetCode session or GitHub token.
 - This repository does not currently include a license file.
 
 ## Project files
