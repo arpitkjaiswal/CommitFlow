@@ -57,7 +57,7 @@ The README records the problem link, difficulty, language, runtime, memory, and 
 
 ## Optional dashboard
 
-The dashboard displays reported sync totals and recent events. Its profile card is a dated snapshot, not live LeetCode data. Dashboard statistics are based on client-reported telemetry and can include repeat syncs; they are not audited user or unique-problem counts.
+The dashboard displays reported sync totals and recent events. Dashboard statistics are based on client-reported telemetry and can include repeat syncs; they are not audited user or unique-problem counts.
 
 ### Run locally
 
