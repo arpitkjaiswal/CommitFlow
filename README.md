@@ -79,18 +79,19 @@ Open `http://127.0.0.1:3000`. `/health` should return `{"status":"ok"}`. The das
 
 ### Cloudflare deployment
 
-The repository includes a GitHub Actions workflow for Cloudflare Workers and D1. It creates the database schema and deploys the optional dashboard. Set these repository Actions secrets first:
+The repository deploys the optional dashboard to Cloudflare Pages at `https://commitflow-dashboard.pages.dev`. The Pages Functions worker uses the existing D1 database. The deploy workflow verifies that the health endpoint responds and that dashboard pages and APIs reject unauthenticated requests before it disables the previous `workers.dev` route.
 
-- `CLOUDFLARE_API_TOKEN` — account-scoped token with **D1: Edit** and **Workers Scripts: Edit**
+Before the first deployment, create a **time-limited** Cloudflare API token with **Pages: Edit**, **Workers Scripts: Edit**, and **D1: Edit** permissions, then save it as the repository Actions secret `CLOUDFLARE_API_TOKEN`. Also set these Actions secrets:
+
 - `CLOUDFLARE_ACCOUNT_ID`
-- `D1_DATABASE_ID` — UUID of the D1 database named in `backend/wrangler.toml`
+- `D1_DATABASE_ID` — UUID of the existing D1 database
 - `ADMIN_USER`
 - `ADMIN_PASSWORD`
 - `TELEMETRY_KEY`
 
-If you want the Chrome extension to send telemetry to the Worker, also set the Actions variable `CORS_ORIGINS` to `chrome-extension://<your-extension-id>`. Then run **Deploy dashboard to Cloudflare** from the repository's **Actions** tab. The workflow summary prints the Worker URL.
+Use separate random values for the admin password and telemetry key; do not reuse or post them in chat. If the Chrome extension should send telemetry, set the Actions variable `CORS_ORIGINS` to `chrome-extension://<your-extension-id>`. Then run **Deploy dashboard to Cloudflare Pages** from the repository's **Actions** tab. After the smoke check passes, set the dashboard URL in the extension to the Pages URL above.
 
-The Cloudflare workflow is configured, but a live production URL has not been verified. The Cloudflare free plan has limits; review [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/). The included `render.yaml` is a separate persistent-disk setup and may incur charges; it is not the free Cloudflare path.
+Cloudflare's free plan has limits; review [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/). The included `render.yaml` is a separate persistent-disk setup and may incur charges; it is not the free Cloudflare path.
 
 ## Development and checks
 
