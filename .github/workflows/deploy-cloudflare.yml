@@ -1,4 +1,4 @@
-name: Deploy dashboard to Cloudflare
+name: Deploy dashboard to Cloudflare Pages
 
 on:
   workflow_dispatch:
@@ -12,51 +12,149 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure D1 binding
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Configure D1 and prepare the Pages bundle
         env:
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
         run: |
           node <<'NODE'
           const fs = require("node:fs");
+          const path = require("node:path");
           const id = process.env.D1_DATABASE_ID || "";
-          if (!/^[0-9a-f-]{36}$/i.test(id)) {
-            throw new Error("Set the D1_DATABASE_ID GitHub Actions secret to the Cloudflare D1 database UUID.");
+          if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id)) {
+            throw new Error("Set D1_DATABASE_ID to the existing Cloudflare D1 database UUID.");
           }
-          const path = "backend/wrangler.toml";
-          const config = fs.readFileSync(path, "utf8");
-          if (!config.includes("__D1_DATABASE_ID__")) {
-            throw new Error("D1 database placeholder was not found.");
+          for (const filename of ["backend/wrangler.toml", "backend/wrangler.pages.toml"]) {
+            const config = fs.readFileSync(filename, "utf8");
+            if (!config.includes("__D1_DATABASE_ID__")) throw new Error("D1 placeholder is missing from " + filename);
+            fs.writeFileSync(filename, config.replace("__D1_DATABASE_ID__", id));
           }
-          fs.writeFileSync(path, config.replace("__D1_DATABASE_ID__", id));
+          const output = "backend/pages-dist";
+          fs.rmSync(output, { recursive: true, force: true });
+          fs.mkdirSync(output, { recursive: true });
+          fs.cpSync("backend/public", output, { recursive: true });
+          fs.copyFileSync("backend/worker.mjs", path.join(output, "_worker.js"));
           NODE
 
-      - name: Apply schema and create Worker
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: backend
-          preCommands: wrangler d1 migrations apply leetsync-telemetry --remote
-          command: deploy
+      - name: Ensure the Pages project exists
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'NODE'
+          const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || "";
+          const token = process.env.CLOUDFLARE_API_TOKEN || "";
+          if (!/^[0-9a-f]{32}$/i.test(accountId) || !token) {
+            throw new Error("Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in repository Actions secrets.");
+          }
+          const base = "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/pages/projects";
+          const headers = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
+          const existing = await fetch(base + "/commitflow-dashboard", { headers });
+          if (existing.status === 404) {
+            const created = await fetch(base, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ name: "commitflow-dashboard", production_branch: "main" }),
+            });
+            const result = await created.json();
+            if (!created.ok || !result.success) throw new Error("Cloudflare could not create the Pages project.");
+          } else {
+            const result = await existing.json();
+            if (!existing.ok || !result.success) throw new Error("Cloudflare could not read the Pages project.");
+          }
+          NODE
 
-      - name: Apply runtime secrets and deploy
-        id: final-deploy
+      - name: Apply D1 schema
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: backend
-          secrets: |
-            ADMIN_USER
-            ADMIN_PASSWORD
-            TELEMETRY_KEY
-          command: deploy
+          command: d1 migrations apply leetsync-telemetry --remote --config wrangler.toml
+
+      - name: Prepare runtime secrets
         env:
           ADMIN_USER: ${{ secrets.ADMIN_USER }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
+          CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const filename = path.join(process.env.RUNNER_TEMP, "commitflow-pages-secrets.json");
+          const values = {
+            ADMIN_USER: process.env.ADMIN_USER || "",
+            ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || "",
+            TELEMETRY_KEY: process.env.TELEMETRY_KEY || "",
+            CORS_ORIGINS: process.env.CORS_ORIGINS || "",
+          };
+          if (!values.ADMIN_USER || Buffer.byteLength(values.ADMIN_PASSWORD) < 32 ||
+              Buffer.byteLength(values.TELEMETRY_KEY) < 32) {
+            throw new Error("Set ADMIN_USER and use separate random ADMIN_PASSWORD and TELEMETRY_KEY values of at least 32 bytes.");
+          }
+          fs.writeFileSync(filename, JSON.stringify(values), { mode: 0o600 });
+          NODE
+
+      - name: Upload Pages runtime secrets
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: backend
+          command: pages secret bulk "${{ runner.temp }}/commitflow-pages-secrets.json" --project-name commitflow-dashboard --config wrangler.pages.toml
+
+      - name: Deploy Pages site
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: backend
+          command: pages deploy pages-dist --project-name commitflow-dashboard --branch main --config wrangler.pages.toml
+
+      - name: Verify Pages health and authentication
+        run: |
+          node --input-type=module <<'NODE'
+          const base = "https://commitflow-dashboard.pages.dev";
+          const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+          let health;
+          for (let attempt = 0; attempt < 8; attempt++) {
+            try {
+              health = await fetch(base + "/health");
+              if (health.ok) break;
+            } catch {}
+            await pause(5000);
+          }
+          if (!health?.ok) throw new Error("Pages health endpoint is not reachable.");
+          const healthBody = await health.json();
+          if (healthBody.status !== "ok") throw new Error("Pages health endpoint returned an unexpected response.");
+          const page = await fetch(base + "/");
+          if (page.status !== 401 || !page.headers.get("www-authenticate")) {
+            throw new Error("Dashboard page is not protected by authentication.");
+          }
+          const stats = await fetch(base + "/api/stats");
+          if (stats.status !== 401) throw new Error("Dashboard API is not protected by authentication.");
+          NODE
+
+      - name: Disable the old workers.dev hostname
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: backend
+          command: deploy --config wrangler.toml
+
+      - name: Clean up runtime secret file
+        if: always()
+        run: rm -f "${{ runner.temp }}/commitflow-pages-secrets.json"
 
       - name: Report dashboard URL
-        env:
-          DASHBOARD_URL: ${{ steps.final-deploy.outputs.deployment-url }}
-        run: echo "Dashboard is available at ${DASHBOARD_URL}" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          {
+            echo "Dashboard is available at https://commitflow-dashboard.pages.dev"
+            echo "The Pages health check passed and unauthenticated dashboard/API access returned HTTP 401."
+            echo "The prior workers.dev route was disabled after the Pages checks passed."
+          } >> "$GITHUB_STEP_SUMMARY"

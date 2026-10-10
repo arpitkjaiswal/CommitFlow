@@ -1,15 +1,9 @@
 name = "commitflow-dashboard"
-main = "worker.mjs"
 compatibility_date = "2026-10-09"
-workers_dev = false
-
-[assets]
-directory = "./public"
-binding = "ASSETS"
-run_worker_first = true
+pages_build_output_dir = "./pages-dist"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "leetsync-telemetry"
 database_id = "__D1_DATABASE_ID__"
-migrations_dir = "migrations"
+migrations_dir = "./migrations"
