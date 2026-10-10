@@ -1,0 +1,9 @@
+name = "commitflow-dashboard"
+compatibility_date = "2026-10-09"
+pages_build_output_dir = "./pages-dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "leetsync-telemetry"
+database_id = "__D1_DATABASE_ID__"
+migrations_dir = "./migrations"
