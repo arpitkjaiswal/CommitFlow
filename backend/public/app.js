@@ -13,17 +13,20 @@ async function fetchData() {
     const logsRes = await fetch('/api/logs');
     if (!logsRes.ok) throw new Error('Logs unavailable: HTTP ' + logsRes.status);
     const logs = await logsRes.json();
-        renderLogs(logs);
+    renderLogs(logs.length === 0 ? null : logs);
 
     // Bind Search Input
     const searchInput = document.getElementById('searchInput');
     searchInput.oninput = () => {
       const query = searchInput.value.toLowerCase().trim();
-      const filtered = logs.filter(l => 
-        l.owner.toLowerCase().includes(query) || 
-        l.repo.toLowerCase().includes(query) ||
-        l.action.toLowerCase().includes(query)
-      );
+      const filtered = logs.filter((log) => {
+        const owner = typeof log.owner === "string" ? log.owner : "";
+        const repo = typeof log.repo === "string" ? log.repo : "";
+        const action = typeof log.action === "string" ? log.action : "";
+        return owner.toLowerCase().includes(query) ||
+          repo.toLowerCase().includes(query) ||
+          action.toLowerCase().includes(query);
+      });
       renderLogs(filtered);
     };
 
